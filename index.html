@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Ratings | Top Games</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts for a gaming aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Custom Configuration for Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0B0F19',
+                            card: '#151C2C',
+                            accent: '#6366F1', // Indigo
+                            neon: '#00F0FF', // Cyan
+                            steam: '#171a21',
+                            steamBlue: '#66c0f4'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0F19; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151; 
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4B5563; 
+        }
+        
+        .neon-shadow {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        
+        .card-hover:hover .neon-shadow {
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-brand-dark text-gray-200 font-sans min-h-screen flex flex-col">
+
+    <nav class="sticky top-0 z-50 bg-brand-dark/90 backdrop-blur-md border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0 flex items-center gap-2 cursor-pointer">
+                    <!-- Controller SVG Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-brand-neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="6" y1="12" x2="10" y2="12"></line>
+                        <line x1="8" y1="10" x2="8" y2="14"></line>
+                        <line x1="15" y1="13" x2="15.01" y2="13"></line>
+                        <line x1="18" y1="11" x2="18.01" y2="11"></line>
+                        <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                    </svg>
+                    <span class="font-display font-bold text-xl tracking-wider text-white">NEXUS<span class="text-brand-accent">RATINGS</span></span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#" class="bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium border-b-2 border-brand-neon">Trending</a>
+                        <a href="#" class="text-gray-300 hover:text-white hover:bg-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-colors">New Releases</a>
+                        <a href="#" class="text-gray-300 hover:text-white hover:bg-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-colors">Top Rated</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="text-center mb-16">
+                <h1 class="text-4xl md:text-5xl font-display font-black text-white mb-4 uppercase tracking-tight">
+                    Discover Your Next <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-accent to-brand-neon">Obsession</span>
+                </h1>
+                <p class="mt-4 text-xl text-gray-400 max-w-2xl mx-auto">
+                    Curated reviews and ratings for the most critical titles in gaming.
+                </p>
+            </div>
+
+            <!-- Game Grid Container -->
+            <div id="game-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- Cards will be dynamically injected here by JavaScript -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-[#080B12] border-t border-gray-800 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-gray-500 text-sm">
+                &copy; 2026 Nexus Ratings. All rights reserved. Not affiliated with Valve Corporation.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Data for the games
+        const games = [
+            {
+                title: "Elden Ring",
+                rating: 5,
+                snippet: "A sprawling dark fantasy action-RPG that redefines the open-world genre with unparalleled exploration and punishing combat.",
+                steamUrl: "https://store.steampowered.com/app/1245620/ELDEN_RING/",
+                // Using high-quality placeholders themed to the game
+                imageUrl: "https://placehold.co/600x800/1a1a2e/e94560?text=Elden+Ring"
+            },
+            {
+                title: "War Thunder",
+                rating: 4,
+                snippet: "The most comprehensive free-to-play, cross-platform, MMO military game featuring aviation, armored vehicles, and naval craft.",
+                steamUrl: "https://store.steampowered.com/app/236390/War_Thunder/",
+                imageUrl: "https://placehold.co/600x800/2a2a2a/f39c12?text=War+Thunder"
+            },
+            {
+                title: "Assassin's Creed Valhalla",
+                rating: 4,
+                snippet: "Become a legendary Viking raider on a quest for glory in a dynamic and beautiful open world set against the brutal backdrop of England's Dark Ages.",
+                steamUrl: "https://store.steampowered.com/app/2208920/Assassins_Creed_Valhalla/",
+                imageUrl: "https://placehold.co/600x800/1b262c/0f4c75?text=AC+Valhalla"
+            },
+            {
+                title: "Tom Clancy's Rainbow Six Siege",
+                rating: 4.5,
+                snippet: "Master the art of destruction and gadgetry in highly tactical, intense, and unforgiving 5v5 team-based firefights.",
+                steamUrl: "https://store.steampowered.com/app/359550/Tom_Clancys_Rainbow_Six_Siege/",
+                imageUrl: "https://placehold.co/600x800/2b2e4a/e84545?text=Rainbow+Six"
+            }
+        ];
+
+        /**
+         * Helper function to generate SVG stars based on rating
+         * @param {number} rating - The rating out of 5
+         * @returns {string} - HTML string containing SVG stars
+         */
+        function generateStars(rating) {
+            let starsHtml = '';
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 !== 0;
+
+            // Full stars
+            for (let i = 0; i < fullStars; i++) {
+                starsHtml += `
+                    <svg class="w-5 h-5 text-yellow-400 fill-current" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                    </svg>
+                `;
+            }
+
+            // Half star (if applicable)
+            if (hasHalfStar) {
+                // Using a split color trick via SVG gradients for a half star
+                starsHtml += `
+                    <svg class="w-5 h-5 text-yellow-400" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="halfGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="50%" stop-color="currentColor" />
+                                <stop offset="50%" stop-color="#4B5563" />
+                            </linearGradient>
+                        </defs>
+                        <path fill="url(#halfGrad)" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                    </svg>
+                `;
+            }
+
+            // Empty stars to fill up to 5
+            const emptyStars = 5 - Math.ceil(rating);
+            for (let i = 0; i < emptyStars; i++) {
+                starsHtml += `
+                    <svg class="w-5 h-5 text-gray-600 fill-current" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                    </svg>
+                `;
+            }
+
+            return starsHtml;
+        }
+
+        // Render the game grid
+        document.addEventListener('DOMContentLoaded', () => {
+            const gridContainer = document.getElementById('game-grid');
+            
+            games.forEach((game) => {
+                // Create card element
+                const card = document.createElement('div');
+                card.className = "bg-brand-card rounded-2xl overflow-hidden flex flex-col group card-hover border border-gray-800 transition-all duration-300 hover:-translate-y-2";
+                
+                // Construct inner HTML
+                card.innerHTML = `
+                    <div class="relative h-64 overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-t from-brand-card to-transparent z-10"></div>
+                        <img src="${game.imageUrl}" alt="${game.title} cover" class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500">
+                        <div class="absolute top-3 right-3 z-20 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-sm font-bold border border-gray-700">
+                            ${game.rating.toFixed(1)}
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 flex flex-col flex-grow relative z-20 -mt-8">
+                        <h2 class="text-xl font-display font-bold text-white mb-2 leading-tight">${game.title}</h2>
+                        
+                        <div class="flex items-center space-x-1 mb-4">
+                            ${generateStars(game.rating)}
+                        </div>
+                        
+                        <p class="text-gray-400 text-sm mb-6 flex-grow leading-relaxed">
+                            "${game.snippet}"
+                        </p>
+                        
+                        <a href="${game.steamUrl}" target="_blank" rel="noopener noreferrer" class="w-full inline-flex justify-center items-center gap-2 bg-[#171a21] hover:bg-[#2a303c] text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 border border-gray-700 hover:border-brand-steamBlue hover:text-brand-steamBlue neon-shadow">
+                            <!-- Steam Icon SVG -->
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0C5.373 0 0 5.373 0 12c0 4.902 2.936 9.123 7.151 10.978l3.197-4.636c-.161-.06-.316-.134-.465-.224-1.918-1.157-2.545-3.659-1.401-5.597 1.139-1.929 3.619-2.556 5.538-1.4 1.918 1.157 2.544 3.659 1.405 5.596-.701 1.189-1.928 1.83-3.178 1.802l-2.82 4.095c1.558.892 3.364 1.386 5.273 1.386 6.627 0 12-5.373 12-12S18.627 0 12 0zm5.185 10.42c-.524-.316-1.192-.148-1.493.376-.299.524-.117 1.192.406 1.508.525.317 1.193.149 1.494-.375.3-.524.118-1.192-.407-1.509zm-3.411 1.701c-.567-.34-1.29-.161-1.616.4-.326.562-.128 1.291.439 1.632.567.34 1.29.161 1.616-.4.326-.562.128-1.291-.439-1.632zm-6.195 2.553l-3.328 4.827c-.246-.153-.485-.316-.714-.491l2.583-4.887c.433-.822 1.432-1.115 2.222-.647.79.467 1.077 1.517.637 2.333l1.171 1.859c-1.393-.102-2.353-1.428-1.912-2.738l-1.071 1.655c-.244-.194-.474-.403-.688-.611z"/>
+                            </svg>
+                            View on Steam
+                        </a>
+                    </div>
+                `;
+                
+                gridContainer.appendChild(card);
+            });
+        });
+    </script>
+</body>
+</html>
