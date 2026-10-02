@@ -90,14 +90,36 @@ export async function sendChatMessage({ text, member, history = [] }) {
           isGemini: Boolean(data.isGemini),
           isRealBackend: true,
         };
+      } else {
+        const errText = await response.text();
+        return {
+          text: `⚠️ Backend Error (HTTP ${response.status}): ${errText}`,
+          citations: ["Backend HTTP Failure"],
+          suggestions: ["Retry Query"],
+          backendSource: "Backend HTTP Error",
+          isRealBackend: false
+        };
       }
     } catch (err) {
-      console.warn('[ChatService] Backend request pending/fallback:', err.message);
+      console.error('[ChatService] Connection error:', err);
+      return {
+        text: `⚠️ [Experiment Mode - No Prebaked Answers]\nCould not connect to backend (${BACKEND_CONFIG.apiUrl}).\nError: ${err.message}`,
+        citations: ["Connection Diagnostic"],
+        suggestions: ["Check port 8000 backend", "Retry Query"],
+        backendSource: "Connection Error",
+        isRealBackend: false
+      };
     }
   }
 
-  // Graceful Local Mock Engine (Used when backend is not running or offline)
-  return generateMockResponse(text, member);
+  // Pure Experiment Mode: Zero prebaked answers
+  return {
+    text: "⚠️ Backend is disabled or unconfigured. No prebaked fallback enabled.",
+    citations: ["Configuration Notice"],
+    suggestions: [],
+    backendSource: "Disabled",
+    isRealBackend: false
+  };
 }
 
 /**

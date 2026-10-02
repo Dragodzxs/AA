@@ -93,15 +93,21 @@ FAQ_KNOWLEDGE_BASE = [
 ]
 
 def query_gemini_ai(user_message, employee_info, history):
-    """Calls Google Gemini API with fallback models if API key is present."""
+    """Calls Google Gemini API. Returns Gemini response or detailed diagnostic error."""
     if not GEMINI_API_KEY:
-        return None
+        return {
+            "text": "⚠️ GEMINI_API_KEY is not configured in .env file.",
+            "citations": [".env Configuration"],
+            "suggestions": ["Add GEMINI_API_KEY to .env"],
+            "backendSource": "Config Error",
+            "isGemini": False
+        }
 
-    # Preferred reliable models in order
     candidate_models = [
+        "gemini-2.5-flash",
         "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-2.5-flash"
+        "gemini-2.0-flash",
+        "gemini-1.5-flash"
     ]
 
     emp_name = employee_info.get("name", "Alex Morgan")
@@ -119,6 +125,8 @@ def query_gemini_ai(user_message, employee_info, history):
 
     prompt = f"Employee Question: {user_message}\nRecent History: {json.dumps(history[-3:] if history else [])}"
 
+    last_error = ""
+
     for model_name in candidate_models:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
@@ -131,7 +139,7 @@ def query_gemini_ai(user_message, employee_info, history):
                     }
                 ],
                 "generationConfig": {
-                    "temperature": 0.3,
+                    "temperature": 0.4,
                     "maxOutputTokens": 600
                 }
             }
@@ -139,11 +147,14 @@ def query_gemini_ai(user_message, employee_info, history):
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": GEMINI_API_KEY
+                },
                 method="POST"
             )
 
-            with urllib.request.urlopen(req, timeout=22) as response:
+            with urllib.request.urlopen(req, timeout=25) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
                 
@@ -160,11 +171,24 @@ def query_gemini_ai(user_message, employee_info, history):
                 parsed["isGemini"] = True
                 print(f"[Gemini SUCCESS] Responded via {model_name}")
                 return parsed
+        except urllib.error.HTTPError as he:
+            err_body = he.read().decode("utf-8", errors="ignore")
+            last_error = f"HTTP {he.code} on {model_name}: {err_body[:300]}"
+            print(f"[Gemini {model_name} HTTP {he.code}] {err_body}", file=sys.stderr)
+            continue
         except Exception as e:
-            print(f"[Gemini {model_name}] error: {e}, trying next candidate...", file=sys.stderr)
+            last_error = f"Error on {model_name}: {str(e)}"
+            print(f"[Gemini {model_name}] error: {e}", file=sys.stderr)
             continue
 
-    return None
+    # Return pure experimental diagnostic directly to the user (NO PREBACKED ANSWERS)
+    return {
+        "text": f"⚠️ [Gemini Experiment Mode] Failed to get live Gemini response.\nDetails: {last_error}",
+        "citations": ["Google API Diagnostic", "Zero Prebaked Fallback"],
+        "suggestions": ["Check Gemini API Key", "Retry with different query"],
+        "backendSource": "Gemini API Error",
+        "isGemini": False
+    }
 
 def match_policy_response(user_message, employee_info):
     """Fallback intelligent policy matcher."""
@@ -261,14 +285,8 @@ class HRRequestHandler(BaseHTTPRequestHandler):
             employee_info = data.get("employee", {})
             history = data.get("history", [])
 
-            # 1. Query Gemini AI first if configured (even for greetings and complex questions)
-            response_data = None
-            if GEMINI_API_KEY:
-                response_data = query_gemini_ai(user_message, employee_info, history)
-
-            # 2. Fall back to local policy FAQ matcher if Gemini is unavailable or not configured
-            if not response_data:
-                response_data = match_policy_response(user_message, employee_info)
+            # Experiment Mode: ONLY Gemini answers (zero prebaked answers)
+            response_data = query_gemini_ai(user_message, employee_info, history)
 
             # Ensure response has required fields
             response_data["isRealBackend"] = True
