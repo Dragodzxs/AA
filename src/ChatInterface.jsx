@@ -29,18 +29,18 @@ const INITIAL_SESSIONS = [
     id: 'session-1',
     title: 'Remote Work & WFH Policy',
     date: 'Today, 09:00 AM',
-    memberId: 'S26CSEU3456',
+    memberId: 'EMP-1042',
     messages: [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Shivam Tyagi! Welcome to your Enterprise HR Copilot. As Frontend Lead on Team Glitch Theory, your WFH quota is active (up to 3 days/week). How can HR help you today with leave balance, hackathon reimbursement, or policies?',
+        text: 'Hello Alex, I am your Enterprise HR Assistant. Your WFH quota is active (up to 3 days/week) and your quarterly wellness stipend has been credited. How can HR assist you today with leave balance, reimbursements, or company policies?',
         timestamp: '09:00 AM',
-        citations: ['Remote Work Policy 2026', 'IT Equipment Grant Sec. 2'],
+        citations: ['Remote Work Policy 2026', 'Workplace Benefits Sec. 2'],
         suggestions: [
           'What are our WFH core hours?',
-          'How to claim hackathon hardware grant?',
           'Check my remaining leave balance',
+          'How to claim equipment reimbursement?',
           'Escalate to Human HR'
         ]
       },
@@ -66,40 +66,38 @@ const INITIAL_SESSIONS = [
   },
   {
     id: 'session-2',
-    title: 'Leave Approval Matrix #279',
+    title: 'Leave Approval Matrix',
     date: 'Yesterday',
-    memberId: 'S26CSEU3411',
+    memberId: 'EMP-1088',
     messages: [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Vedant Srivastava! Welcome to the Team Leader HR Portal. As leader of Glitch Theory (Team #279), your team leave approval dashboard is synced. How can HR assist with leadership policies or hackathon on-duty allowances?',
+        text: 'Hello Sarah, I am your Enterprise HR Assistant. Your annual performance review check-in is logged and your medical insurance benefits are active. How can HR assist you today with team leave approvals or workplace guidelines?',
         timestamp: 'Yesterday, 04:15 PM',
-        citations: ['Team Leader Manual 2026', 'Hackathon On-Duty Policy'],
+        citations: ['Team Management Guide 2026', 'Health & Insurance Policy'],
         suggestions: [
           'How do I approve team leave requests?',
-          'Hackathon on-duty attendance rules',
-          'Submit team travel reimbursement'
+          'Health insurance claim procedure'
         ]
       }
     ]
   },
   {
     id: 'session-3',
-    title: 'Azure Cloud Reimbursement',
+    title: 'Cloud Workstation Allowance',
     date: 'Sep 29',
-    memberId: 'S26CSEU3458',
+    memberId: 'EMP-1015',
     messages: [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Shikhar Saxena! Welcome to your HR Assistant. Your Azure cloud compute grant and backend security clearance are active. What HR or workplace policies can I clarify for you today?',
+        text: 'Hello Jordan, I am your Enterprise HR Assistant. Your cloud workspace allowance and workstation grant are verified. What company policies, leave guidelines, or allowances can I clarify for you today?',
         timestamp: 'Sep 29, 02:30 PM',
         citations: ['Cloud Reimbursement Policy', 'Security Access Guidelines'],
         suggestions: [
-          'Azure cloud stipend claim steps',
-          'Backend server access guidelines',
-          'WFH policy for engineers'
+          'Cloud stipend claim procedure',
+          'WFH guidelines for engineering'
         ]
       }
     ]
@@ -108,13 +106,13 @@ const INITIAL_SESSIONS = [
     id: 'session-4',
     title: 'Sarah Jenkins • HR Hand-off',
     date: 'Sep 27',
-    memberId: 'S26CSEU3456',
+    memberId: 'EMP-1042',
     messages: [
       {
         id: 1,
         sender: 'agent',
         agentName: 'Sarah Jenkins',
-        text: 'Hi Shivam, I am Sarah from Human Resources. I have noted your inquiry regarding team hardware allocation for Project #279.',
+        text: 'Hi Alex, I am Sarah from Human Resources. I have noted your inquiry regarding team hardware allocation for Project #279.',
         timestamp: 'Sep 27, 11:20 AM',
         citations: ['Direct HR Representative Hand-off'],
         suggestions: [
@@ -131,10 +129,10 @@ const ChatInterface = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState(TEAM_MEMBERS[0].id);
   
-  // 3 Modes: 'input' | 'window' | 'fullscreen'
-  const [displayMode, setDisplayMode] = useState('window');
+  // Start minimized in 'input' mode so chat is NOT wide open upon site visit!
+  const [displayMode, setDisplayMode] = useState('input');
   
-  // Hover Sidebar State: Expands the moment pointer hovers on it
+  // Hover Sidebar State
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
   // Chat sessions state
@@ -161,7 +159,9 @@ const ChatInterface = () => {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (displayMode !== 'input') {
+      scrollToBottom();
+    }
   }, [currentMessages, botIsTyping, displayMode]);
 
   // When a persona tab is clicked, update active member & start/find their session
@@ -205,7 +205,7 @@ const ChatInterface = () => {
     const newSessionId = `session-${Date.now()}`;
     const newSession = {
       id: newSessionId,
-      title: `New HR Query (${activeMember.shortName})`,
+      title: `New Query (${activeMember.shortName})`,
       date: 'Just now',
       memberId: selectedMemberId,
       messages: [
@@ -218,7 +218,7 @@ const ChatInterface = () => {
           suggestions: activeMember.suggestions || [
             'What is our WFH core hours policy?',
             'Check my remaining leave balance',
-            'Hackathon expense reimbursement',
+            'How to claim reimbursement?',
             'Escalate to Human HR'
           ]
         }
@@ -258,7 +258,7 @@ const ChatInterface = () => {
 
     if (lower.includes('escalate') || lower.includes('human') || lower.includes('sarah') || lower.includes('agent')) {
       setEscalated(true);
-      responseText = `Hi ${activeMember.shortName}, I am Sarah from Human Resources. I've taken over this chat for team Glitch Theory (#279). How can I assist you with your specific query?`;
+      responseText = `Hi ${activeMember.shortName}, I am Sarah from Human Resources. I've taken over this chat for Employee record #${activeMember.id}. How can I assist you with your specific query?`;
       citations = ['Direct HR Representative Hand-off'];
       followUpSuggestions = [
         'Review my grievance ticket',
@@ -289,32 +289,32 @@ const ChatInterface = () => {
     }
 
     if (lower.includes('wfh') || lower.includes('remote') || lower.includes('home')) {
-      responseText = `Under the Bennett Enterprise Remote Policy, full-time engineering employees like yourself (${activeMember.role}) can work remotely up to 3 days/week with core synchronous hours between 10:00 AM and 3:00 PM.`;
+      responseText = `Under the Enterprise Remote Work Policy, full-time staff can work remotely up to 3 days/week with core synchronous hours between 10:00 AM and 3:00 PM.`;
       citations = ['Remote Work Policy 2026', 'Employee Handbook Sec. 4'];
       followUpSuggestions = [
         'Who approves my remote work days?',
-        'Can I work remotely during hackathons?',
+        'Can I work remotely during client projects?',
         'What equipment allowance do I get?'
       ];
     } else if (lower.includes('leave') || lower.includes('vacation') || lower.includes('holiday')) {
-      responseText = `${activeMember.name}, your current record (${activeMember.id}) shows 14 remaining paid leave days. Planned leave over 2 consecutive days requires Team Leader (${TEAM_MEMBERS.find(m => m.role === 'Team Leader')?.name}) sign-off in the portal.`;
+      responseText = `${activeMember.name}, your employee file (${activeMember.id}) shows 14 remaining paid leave days. Planned leaves over 2 consecutive days require manager sign-off in the HR portal.`;
       citations = ['Annual Leave Guidelines', 'Manager Approval Matrix'];
       followUpSuggestions = [
         'How do I submit sick leave?',
-        'View team leave calendar',
-        'Can leave be carried over to 2027?'
+        'View annual holiday calendar',
+        'Can leave be carried over to next year?'
       ];
-    } else if (lower.includes('reimburse') || lower.includes('hackathon') || lower.includes('grant') || lower.includes('allowance')) {
-      responseText = `For Microsoft Innovate 2026, team Glitch Theory members are eligible for up to ₹5,000 per member in hardware/cloud credit reimbursements upon submitting valid tax invoices under Project #279.`;
-      citations = ['Innovation Grant Memo', 'Finance Travel & Event Policy'];
+    } else if (lower.includes('reimburse') || lower.includes('allowance') || lower.includes('grant') || lower.includes('expense')) {
+      responseText = `Employees under policy tier ${activeMember.id} are eligible for up to ₹5,000 in workstation and wellness reimbursements upon submitting valid receipts through the finance portal.`;
+      citations = ['Workplace Wellness Memo', 'Corporate Travel & Expense Policy'];
       followUpSuggestions = [
         'Where do I upload invoice receipts?',
-        'Are Azure API credits covered?',
+        'Are internet & mobile bills covered?',
         'Reimbursement payment timeline'
       ];
     } else {
       responseText = `I have logged your inquiry regarding "${queryText}" for ${activeMember.name} (${activeMember.id}). All responses are verified against our centralized policy repository.`;
-      citations = ['Enterprise FAQ Sec. 2', 'Bennett Code of Conduct'];
+      citations = ['Enterprise FAQ Sec. 2', 'Corporate Code of Conduct'];
       followUpSuggestions = [
         'What is our WFH core hours policy?',
         'Check my remaining leave balance',
@@ -325,9 +325,8 @@ const ChatInterface = () => {
     setSessions(prev => prev.map(s => {
       if (s.id !== currentSessionId) return s;
       
-      // Auto-update generic title to the user's first query
       let newTitle = s.title;
-      if (s.title.startsWith('New HR Query') || s.title.startsWith('HR Chat')) {
+      if (s.title.startsWith('New Query') || s.title.startsWith('HR Chat')) {
         newTitle = queryText.length > 28 ? `${queryText.slice(0, 28)}...` : queryText;
       }
 
@@ -369,6 +368,7 @@ const ChatInterface = () => {
     }));
     setInputValue('');
 
+    // Open window automatically when user sends message
     if (displayMode === 'input') {
       setDisplayMode('window');
     }
@@ -409,16 +409,16 @@ const ChatInterface = () => {
         />
       )}
 
-      {/* Main Dynamic Container: changes size/position based on 3 modes */}
+      {/* Main Dynamic Container */}
       <div 
         className={`font-sans pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isFullscreen 
             ? 'fixed inset-3 md:inset-8 z-50 flex flex-col max-w-6xl mx-auto' 
-            : 'fixed bottom-6 right-6 w-full max-w-[600px] flex flex-col items-end justify-end z-50'
+            : 'fixed bottom-6 right-6 w-full max-w-[620px] flex flex-col items-end justify-end z-50'
         }`}
       >
         
-        {/* Chat Window Card (Visible in 'window' and 'fullscreen' modes) */}
+        {/* Chat Window Card (Opens when in 'window' or 'fullscreen' mode) */}
         <div 
           className={`w-full flex flex-col transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] origin-bottom overflow-hidden ${
             isInputOnly 
@@ -441,11 +441,11 @@ const ChatInterface = () => {
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-bold tracking-tight">Enterprise HR Copilot</h2>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/30 text-blue-200 border border-blue-400/30">
-                      Team #279
+                      Smart Assistant
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Microsoft Innovate 2026 • Glitch Theory
+                    AI Knowledge Base • Cited Policy Answers
                   </p>
                 </div>
               </div>
@@ -521,7 +521,7 @@ const ChatInterface = () => {
             {/* Middle Workspace: Hover-Expanding Sidebar on the Left + Main Chat Area */}
             <div className="flex-1 flex overflow-hidden relative">
               
-              {/* SIDEBAR: EXPANDS ON HOVER (Slim 56px rail -> Expands to 280px on pointer hover) */}
+              {/* SIDEBAR: EXPANDS ON HOVER */}
               <div 
                 onMouseEnter={() => setIsSidebarHovered(true)}
                 onMouseLeave={() => setIsSidebarHovered(false)}
@@ -580,7 +580,6 @@ const ChatInterface = () => {
                         }`}
                         title={session.title}
                       >
-                        {/* Compact Session Icon */}
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold ${
                           isSelected 
                             ? 'bg-white text-blue-700' 
@@ -589,7 +588,6 @@ const ChatInterface = () => {
                           <MessageSquare size={14} />
                         </div>
 
-                        {/* Expanded Session Details */}
                         {isSidebarHovered && (
                           <div className="flex-1 min-w-0 pr-1">
                             <p className="text-xs font-medium leading-tight truncate">
@@ -607,7 +605,6 @@ const ChatInterface = () => {
                           </div>
                         )}
 
-                        {/* Delete Session Button (Visible on hover when sidebar is expanded) */}
                         {isSidebarHovered && sessions.length > 1 && (
                           <button
                             onClick={(e) => handleDeleteSession(e, session.id)}
@@ -636,17 +633,17 @@ const ChatInterface = () => {
                 </div>
               </div>
 
-              {/* MAIN CONTENT AREA: Shifted slightly to accommodate the slim 56px sidebar rail */}
+              {/* MAIN CONTENT AREA */}
               <div className="flex-1 flex flex-col min-w-0 pl-14 overflow-hidden">
                 
-                {/* PERSONA TABS: Team Members with ID, Name & Role */}
+                {/* PERSONA TABS: Dummy Names & IDs (Alex Morgan, Sarah Chen, etc.) */}
                 <div className="bg-slate-100/90 border-b border-slate-200 px-3 py-2 flex-shrink-0">
                   <div className="flex items-center justify-between mb-1 px-1">
                     <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1">
-                      <Users size={11} /> Switch Persona
+                      <Users size={11} /> Switch Employee Profile
                     </span>
-                    <span className="text-[10px] text-blue-600 font-semibold truncate max-w-[150px]">
-                      {activeMember.program}
+                    <span className="text-[10px] text-blue-600 font-semibold font-mono">
+                      Active: {activeMember.id}
                     </span>
                   </div>
 
@@ -676,15 +673,11 @@ const ChatInterface = () => {
                           </div>
 
                           <div className="flex flex-col pr-1">
-                            <span className="text-xs font-bold leading-tight truncate max-w-[100px]">
+                            <span className="text-xs font-bold leading-tight truncate max-w-[105px]">
                               {member.name}
                             </span>
                             <div className="flex items-center gap-1 text-[9px] opacity-85 leading-tight">
                               <span className="font-mono">{member.id}</span>
-                              <span>•</span>
-                              <span className={isActive ? 'text-blue-100 font-semibold' : 'text-slate-500'}>
-                                {member.role}
-                              </span>
                             </div>
                           </div>
                         </button>
@@ -712,7 +705,7 @@ const ChatInterface = () => {
                   <div className="flex items-center justify-center mb-2">
                     <div className="px-3.5 py-1 bg-white/75 backdrop-blur-md rounded-full border border-slate-200 text-xs text-slate-600 shadow-sm flex items-center gap-1.5">
                       <Sparkles size={13} className="text-blue-600" />
-                      Active Session: <strong className="text-slate-800">{currentSession.title}</strong> • {activeMember.shortName}
+                      Active Session: <strong className="text-slate-800">{currentSession.title}</strong> • {activeMember.name}
                     </div>
                   </div>
 
@@ -761,9 +754,31 @@ const ChatInterface = () => {
           </div>
         </div>
 
-        {/* TASKBAR / INPUT BAR (+30% INCREASE IN SIZE: min-h-[60px], py-3, px-4, text-[16px]) */}
+        {/* TASKBAR / INPUT BAR (Uncut text greeting, clean placeholder, roomy size) */}
         <div className="pointer-events-auto mt-3 w-full flex-shrink-0">
-          <div className="w-full rounded-2xl p-2.5 flex items-center gap-2.5 bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgb(0,0,0,0.15)] transition-all duration-300">
+          
+          {/* Helpful greeting prompt shown when input bar is docked (never cut off) */}
+          {isInputOnly && (
+            <div 
+              onClick={() => setDisplayMode('window')}
+              className="mb-2 px-4 py-2 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-xl text-white rounded-2xl border border-white/20 shadow-xl cursor-pointer flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 transition-all group"
+            >
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0`}>
+                  {activeMember.avatar}
+                </div>
+                <p className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors truncate">
+                  <span className="font-bold text-white">Hello {activeMember.name},</span> how can HR assist you with leave, WFH, or company policies today?
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-400/30 whitespace-nowrap flex items-center gap-1">
+                Open Chat <ChevronUp size={12} />
+              </span>
+            </div>
+          )}
+
+          {/* Main Input Bar */}
+          <div className="w-full rounded-2xl p-2.5 flex items-center gap-2.5 bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgb(0,0,0,0.18)] transition-all duration-300">
             
             {/* Mode Switcher Button: Opens or toggles window */}
             <button 
@@ -799,7 +814,7 @@ const ChatInterface = () => {
               <Paperclip size={22} strokeWidth={2} />
             </button>
             
-            {/* Roomy enlarged input field */}
+            {/* Roomy enlarged input field with natural un-cut placeholder */}
             <textarea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -807,8 +822,8 @@ const ChatInterface = () => {
               onFocus={() => {
                 if (isInputOnly) setDisplayMode('window');
               }}
-              placeholder={`Ask HR as ${activeMember.name} (e.g. leave balance, WFH, allowances)...`}
-              className="flex-1 max-h-36 bg-transparent border-none focus:ring-0 resize-none py-2 px-2 text-[16px] text-slate-900 placeholder-slate-500 font-medium min-h-[48px] leading-relaxed"
+              placeholder={`Hello ${activeMember.shortName}, ask HR anything (e.g. leave balance, WFH, allowances)...`}
+              className="flex-1 max-h-36 bg-transparent border-none focus:ring-0 resize-none py-2 px-2 text-[15px] sm:text-[16px] text-slate-900 placeholder-slate-500 font-medium min-h-[48px] leading-relaxed"
               rows="1"
             />
             

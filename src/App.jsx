@@ -82,7 +82,7 @@ function App() {
               </div>
               <h3 className="text-sm font-bold text-white mb-1">Multi-Persona Context</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Switch between team members (Shivam, Vedant, Shikhar, etc.) to view personalized greetings and leave records.
+                Switch between employee profiles (Alex, Sarah, Jordan, etc.) to view personalized greetings, leave balances, and cited policies.
               </p>
             </div>
 
