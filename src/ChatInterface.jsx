@@ -13,11 +13,118 @@ import {
   Users,
   Maximize2,
   Minimize2,
-  Minus
+  Minus,
+  Plus,
+  MessageSquare,
+  History,
+  Trash2,
+  Clock
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 import { MessageBubble } from './MessageBubble';
 import { TEAM_MEMBERS } from './teamData';
+
+const INITIAL_SESSIONS = [
+  {
+    id: 'session-1',
+    title: 'Remote Work & WFH Policy',
+    date: 'Today, 09:00 AM',
+    memberId: 'S26CSEU3456',
+    messages: [
+      {
+        id: 1,
+        sender: 'bot',
+        text: 'Hello Shivam Tyagi! Welcome to your Enterprise HR Copilot. As Frontend Lead on Team Glitch Theory, your WFH quota is active (up to 3 days/week). How can HR help you today with leave balance, hackathon reimbursement, or policies?',
+        timestamp: '09:00 AM',
+        citations: ['Remote Work Policy 2026', 'IT Equipment Grant Sec. 2'],
+        suggestions: [
+          'What are our WFH core hours?',
+          'How to claim hackathon hardware grant?',
+          'Check my remaining leave balance',
+          'Escalate to Human HR'
+        ]
+      },
+      {
+        id: 2,
+        sender: 'user',
+        text: 'What are our WFH core hours?',
+        timestamp: '09:02 AM'
+      },
+      {
+        id: 3,
+        sender: 'bot',
+        text: 'Under the Bennett Enterprise Remote Policy, core synchronous hours are 10:00 AM to 3:00 PM for all engineering teams.',
+        timestamp: '09:02 AM',
+        citations: ['Remote Work Policy 2026', 'Employee Handbook Sec. 4'],
+        suggestions: [
+          'Can I work remotely during hackathons?',
+          'Who approves my remote work days?',
+          'Escalate to Human HR'
+        ]
+      }
+    ]
+  },
+  {
+    id: 'session-2',
+    title: 'Leave Approval Matrix #279',
+    date: 'Yesterday',
+    memberId: 'S26CSEU3411',
+    messages: [
+      {
+        id: 1,
+        sender: 'bot',
+        text: 'Hello Vedant Srivastava! Welcome to the Team Leader HR Portal. As leader of Glitch Theory (Team #279), your team leave approval dashboard is synced. How can HR assist with leadership policies or hackathon on-duty allowances?',
+        timestamp: 'Yesterday, 04:15 PM',
+        citations: ['Team Leader Manual 2026', 'Hackathon On-Duty Policy'],
+        suggestions: [
+          'How do I approve team leave requests?',
+          'Hackathon on-duty attendance rules',
+          'Submit team travel reimbursement'
+        ]
+      }
+    ]
+  },
+  {
+    id: 'session-3',
+    title: 'Azure Cloud Reimbursement',
+    date: 'Sep 29',
+    memberId: 'S26CSEU3458',
+    messages: [
+      {
+        id: 1,
+        sender: 'bot',
+        text: 'Hello Shikhar Saxena! Welcome to your HR Assistant. Your Azure cloud compute grant and backend security clearance are active. What HR or workplace policies can I clarify for you today?',
+        timestamp: 'Sep 29, 02:30 PM',
+        citations: ['Cloud Reimbursement Policy', 'Security Access Guidelines'],
+        suggestions: [
+          'Azure cloud stipend claim steps',
+          'Backend server access guidelines',
+          'WFH policy for engineers'
+        ]
+      }
+    ]
+  },
+  {
+    id: 'session-4',
+    title: 'Sarah Jenkins • HR Hand-off',
+    date: 'Sep 27',
+    memberId: 'S26CSEU3456',
+    messages: [
+      {
+        id: 1,
+        sender: 'agent',
+        agentName: 'Sarah Jenkins',
+        text: 'Hi Shivam, I am Sarah from Human Resources. I have noted your inquiry regarding team hardware allocation for Project #279.',
+        timestamp: 'Sep 27, 11:20 AM',
+        citations: ['Direct HR Representative Hand-off'],
+        suggestions: [
+          'Schedule a 1-on-1 HR call',
+          'Confidential policy inquiry'
+        ]
+      }
+    ]
+  }
+];
 
 const ChatInterface = () => {
   const [role, setRole] = useState('Employee');
@@ -27,37 +134,22 @@ const ChatInterface = () => {
   // 3 Modes: 'input' | 'window' | 'fullscreen'
   const [displayMode, setDisplayMode] = useState('window');
   
+  // Hover Sidebar State: Expands the moment pointer hovers on it
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  // Chat sessions state
+  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
+  const [currentSessionId, setCurrentSessionId] = useState('session-1');
+
   const [inputValue, setInputValue] = useState('');
   const [escalated, setEscalated] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [botIsTyping, setBotIsTyping] = useState(false);
-  
-  // Initial conversations stored per team member with suggestions under each greeting
-  const [chatHistories, setChatHistories] = useState(() => {
-    const initial = {};
-    TEAM_MEMBERS.forEach(member => {
-      initial[member.id] = [
-        {
-          id: 1,
-          sender: 'bot',
-          text: member.greeting,
-          timestamp: '09:00 AM',
-          citations: member.citations || ['Employee Handbook 2026', 'HR Policy Sec. 4'],
-          suggestions: member.suggestions || [
-            'What is our WFH core hours policy?',
-            'Check my remaining leave balance',
-            'Hackathon expense reimbursement',
-            'Escalate to Human HR'
-          ]
-        }
-      ];
-    });
-    return initial;
-  });
 
   const messagesEndRef = useRef(null);
   const activeMember = TEAM_MEMBERS.find(m => m.id === selectedMemberId) || TEAM_MEMBERS[0];
-  const currentMessages = chatHistories[selectedMemberId] || [];
+  const currentSession = sessions.find(s => s.id === currentSessionId) || sessions[0];
+  const currentMessages = currentSession?.messages || [];
 
   const handleLoginSuccess = () => {
     setRole('HR Manager');
@@ -72,8 +164,90 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [currentMessages, botIsTyping, displayMode]);
 
+  // When a persona tab is clicked, update active member & start/find their session
   const handleSelectMember = (memberId) => {
     setSelectedMemberId(memberId);
+    const memberObj = TEAM_MEMBERS.find(m => m.id === memberId);
+    
+    // Check if an existing session belongs to this member, else create one
+    const existingSession = sessions.find(s => s.memberId === memberId);
+    if (existingSession) {
+      setCurrentSessionId(existingSession.id);
+    } else if (memberObj) {
+      const newSessionId = `session-${Date.now()}`;
+      const newSession = {
+        id: newSessionId,
+        title: `HR Chat (${memberObj.shortName})`,
+        date: 'Just now',
+        memberId: memberId,
+        messages: [
+          {
+            id: 1,
+            sender: 'bot',
+            text: memberObj.greeting,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            citations: memberObj.citations || ['Employee Handbook 2026'],
+            suggestions: memberObj.suggestions || [
+              'What is our WFH core hours policy?',
+              'Check my remaining leave balance',
+              'Escalate to Human HR'
+            ]
+          }
+        ]
+      };
+      setSessions(prev => [newSession, ...prev]);
+      setCurrentSessionId(newSessionId);
+    }
+  };
+
+  // Create a brand new chat session
+  const handleNewChat = () => {
+    const newSessionId = `session-${Date.now()}`;
+    const newSession = {
+      id: newSessionId,
+      title: `New HR Query (${activeMember.shortName})`,
+      date: 'Just now',
+      memberId: selectedMemberId,
+      messages: [
+        {
+          id: 1,
+          sender: 'bot',
+          text: activeMember.greeting,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          citations: activeMember.citations || ['Employee Handbook 2026', 'HR Policy Sec. 4'],
+          suggestions: activeMember.suggestions || [
+            'What is our WFH core hours policy?',
+            'Check my remaining leave balance',
+            'Hackathon expense reimbursement',
+            'Escalate to Human HR'
+          ]
+        }
+      ]
+    };
+    setSessions(prev => [newSession, ...prev]);
+    setCurrentSessionId(newSessionId);
+    setEscalated(false);
+  };
+
+  // Switch to a previous chat session
+  const handleSelectSession = (sessionId) => {
+    setCurrentSessionId(sessionId);
+    const targetSession = sessions.find(s => s.id === sessionId);
+    if (targetSession && targetSession.memberId) {
+      setSelectedMemberId(targetSession.memberId);
+    }
+  };
+
+  // Delete a chat session
+  const handleDeleteSession = (e, sessionId) => {
+    e.stopPropagation();
+    if (sessions.length <= 1) return;
+    const remaining = sessions.filter(s => s.id !== sessionId);
+    setSessions(remaining);
+    if (currentSessionId === sessionId) {
+      setCurrentSessionId(remaining[0].id);
+      if (remaining[0].memberId) setSelectedMemberId(remaining[0].memberId);
+    }
   };
 
   const processQueryResponse = (queryText) => {
@@ -92,20 +266,23 @@ const ChatInterface = () => {
         'Confidential policy inquiry'
       ];
 
-      setChatHistories(prev => ({
-        ...prev,
-        [selectedMemberId]: [
-          ...(prev[selectedMemberId] || []),
-          {
-            id: (prev[selectedMemberId]?.length || 0) + 2,
-            sender: 'agent',
-            agentName: 'Sarah Jenkins',
-            text: responseText,
-            citations: citations,
-            suggestions: followUpSuggestions,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]
+      setSessions(prev => prev.map(s => {
+        if (s.id !== currentSessionId) return s;
+        return {
+          ...s,
+          messages: [
+            ...s.messages,
+            {
+              id: s.messages.length + 2,
+              sender: 'agent',
+              agentName: 'Sarah Jenkins',
+              text: responseText,
+              citations: citations,
+              suggestions: followUpSuggestions,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        };
       }));
       setBotIsTyping(false);
       return;
@@ -145,19 +322,30 @@ const ChatInterface = () => {
       ];
     }
 
-    setChatHistories(prev => ({
-      ...prev,
-      [selectedMemberId]: [
-        ...(prev[selectedMemberId] || []),
-        {
-          id: (prev[selectedMemberId]?.length || 0) + 2,
-          sender: 'bot',
-          text: responseText,
-          citations: citations,
-          suggestions: followUpSuggestions,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentSessionId) return s;
+      
+      // Auto-update generic title to the user's first query
+      let newTitle = s.title;
+      if (s.title.startsWith('New HR Query') || s.title.startsWith('HR Chat')) {
+        newTitle = queryText.length > 28 ? `${queryText.slice(0, 28)}...` : queryText;
+      }
+
+      return {
+        ...s,
+        title: newTitle,
+        messages: [
+          ...s.messages,
+          {
+            id: s.messages.length + 2,
+            sender: 'bot',
+            text: responseText,
+            citations: citations,
+            suggestions: followUpSuggestions,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]
+      };
     }));
     setBotIsTyping(false);
   };
@@ -172,13 +360,15 @@ const ChatInterface = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setChatHistories(prev => ({
-      ...prev,
-      [selectedMemberId]: [...(prev[selectedMemberId] || []), newMessage]
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentSessionId) return s;
+      return {
+        ...s,
+        messages: [...s.messages, newMessage]
+      };
     }));
     setInputValue('');
 
-    // If currently in input mode, open standard window mode
     if (displayMode === 'input') {
       setDisplayMode('window');
     }
@@ -224,7 +414,7 @@ const ChatInterface = () => {
         className={`font-sans pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isFullscreen 
             ? 'fixed inset-3 md:inset-8 z-50 flex flex-col max-w-6xl mx-auto' 
-            : 'fixed bottom-6 right-6 w-full max-w-[560px] flex flex-col items-end justify-end z-50'
+            : 'fixed bottom-6 right-6 w-full max-w-[600px] flex flex-col items-end justify-end z-50'
         }`}
       >
         
@@ -235,14 +425,14 @@ const ChatInterface = () => {
               ? 'scale-95 opacity-0 invisible pointer-events-none h-0' 
               : isFullscreen
                 ? 'scale-100 opacity-100 visible pointer-events-auto flex-1 h-full'
-                : 'scale-100 opacity-100 visible pointer-events-auto h-[580px]'
+                : 'scale-100 opacity-100 visible pointer-events-auto h-[600px]'
           }`}
         >
           {/* Card Glass Body */}
-          <div className="w-full h-full flex flex-col bg-white/80 backdrop-blur-2xl rounded-3xl border border-white/70 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden">
+          <div className="w-full h-full flex flex-col bg-white/85 backdrop-blur-2xl rounded-3xl border border-white/70 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden relative">
             
             {/* Top Brand Header */}
-            <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-indigo-950/95 backdrop-blur-md text-white flex items-center justify-between border-b border-white/10 flex-shrink-0">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-indigo-950/95 backdrop-blur-md text-white flex items-center justify-between border-b border-white/10 flex-shrink-0 z-30">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
                   <Bot size={22} className="text-white" />
@@ -260,7 +450,7 @@ const ChatInterface = () => {
                 </div>
               </div>
 
-              {/* Header Controls: Role Switcher + Mode Toggles (Fullscreen / Window / Minimize) */}
+              {/* Header Controls: Role Switcher + Mode Toggles */}
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <button 
@@ -299,7 +489,7 @@ const ChatInterface = () => {
                   )}
                 </div>
 
-                {/* Mode 1 & 2 Toggle: Fullscreen vs Window */}
+                {/* Mode Toggles */}
                 {isFullscreen ? (
                   <button 
                     onClick={() => setDisplayMode('window')}
@@ -318,7 +508,6 @@ const ChatInterface = () => {
                   </button>
                 )}
 
-                {/* Mode 3 Toggle: Minimize to Input Bar */}
                 <button 
                   onClick={() => setDisplayMode('input')}
                   className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -329,120 +518,244 @@ const ChatInterface = () => {
               </div>
             </div>
 
-            {/* PERSONA TABS: Team Members with ID, Name & Role */}
-            <div className="bg-slate-100/80 border-b border-slate-200/80 px-4 py-2.5 flex-shrink-0">
-              <div className="flex items-center justify-between mb-1.5 px-1">
-                <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1">
-                  <Users size={12} /> Select Team Member Profile
-                </span>
-                <span className="text-[10px] text-blue-600 font-semibold">
-                  {activeMember.program}
-                </span>
-              </div>
-
-              {/* Horizontally Scrollable Team Tabs */}
-              <div 
-                className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                {TEAM_MEMBERS.map((member) => {
-                  const isActive = member.id === selectedMemberId;
-                  return (
-                    <button
-                      key={member.id}
-                      onClick={() => handleSelectMember(member.id)}
-                      className={`flex-shrink-0 flex items-center gap-2.5 px-3 py-1.5 rounded-2xl transition-all duration-200 border text-left ${
-                        isActive
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/25 scale-[1.02]'
-                          : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200/90 shadow-sm'
-                      }`}
-                    >
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm ${
-                        isActive 
-                          ? 'bg-white text-blue-700' 
-                          : `bg-gradient-to-tr ${member.color} text-white`
-                      }`}>
-                        {member.avatar}
-                      </div>
-
-                      <div className="flex flex-col pr-1">
-                        <span className="text-xs font-bold leading-tight truncate max-w-[110px]">
-                          {member.name}
-                        </span>
-                        <div className="flex items-center gap-1 text-[10px] opacity-85 leading-tight">
-                          <span className="font-mono">{member.id}</span>
-                          <span>•</span>
-                          <span className={isActive ? 'text-blue-100 font-semibold' : 'text-slate-500'}>
-                            {member.role}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* HR Manager Note Badge */}
-            {role === 'HR Manager' && (
-              <div className="px-4 py-1.5 bg-purple-500/15 text-purple-900 font-semibold text-xs border-b border-purple-200/50 flex items-center gap-2 flex-shrink-0">
-                <Shield size={13} strokeWidth={2.5} className="text-purple-700" />
-                Viewing administrative records for {activeMember.name} ({activeMember.id})
-              </div>
-            )}
-
-            {/* Chat History Area */}
-            <div 
-              className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 scroll-smooth"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <style>{`div::-webkit-scrollbar { display: none; }`}</style>
+            {/* Middle Workspace: Hover-Expanding Sidebar on the Left + Main Chat Area */}
+            <div className="flex-1 flex overflow-hidden relative">
               
-              {/* Persona Context Badge inside Chat */}
-              <div className="flex items-center justify-center mb-2">
-                <div className="px-3.5 py-1 bg-white/70 backdrop-blur-md rounded-full border border-slate-200 text-xs text-slate-600 shadow-sm flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-blue-600" />
-                  Active Employee: <strong className="text-slate-800">{activeMember.name}</strong> ({activeMember.id}) • {activeMember.role}
+              {/* SIDEBAR: EXPANDS ON HOVER (Slim 56px rail -> Expands to 280px on pointer hover) */}
+              <div 
+                onMouseEnter={() => setIsSidebarHovered(true)}
+                onMouseLeave={() => setIsSidebarHovered(false)}
+                className={`absolute left-0 top-0 bottom-0 z-20 flex flex-col bg-slate-900/95 backdrop-blur-2xl text-white border-r border-white/15 shadow-2xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
+                  isSidebarHovered ? 'w-72 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'w-14'
+                }`}
+              >
+                {/* Sidebar Header & New Chat Button */}
+                <div className="p-2.5 border-b border-white/10 flex-shrink-0">
+                  <button
+                    onClick={handleNewChat}
+                    className="w-full flex items-center gap-3 p-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs transition-all duration-200 shadow-md shadow-blue-500/25 active:scale-95 group"
+                    title="Start New Chat Session"
+                  >
+                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:rotate-90 transition-transform">
+                      <Plus size={16} strokeWidth={3} />
+                    </div>
+                    {isSidebarHovered && (
+                      <span className="truncate whitespace-nowrap tracking-wide">
+                        + New HR Chat
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Section Title when Hovered */}
+                <div className="px-3.5 pt-3 pb-1 flex items-center justify-between text-slate-400 flex-shrink-0">
+                  {isSidebarHovered ? (
+                    <span className="text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5 text-slate-300">
+                      <History size={13} className="text-blue-400" /> Previous Chats ({sessions.length})
+                    </span>
+                  ) : (
+                    <div className="w-full flex justify-center py-1">
+                      <Clock size={16} className="text-slate-400" title="Recent Chat Sessions" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Scrollable Previous Sessions List */}
+                <div 
+                  className="flex-1 overflow-y-auto px-2 py-1 space-y-1.5 scrollbar-none"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {sessions.map((session) => {
+                    const isSelected = session.id === currentSessionId;
+                    const sessionMember = TEAM_MEMBERS.find(m => m.id === session.memberId);
+                    
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => handleSelectSession(session.id)}
+                        className={`w-full flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-200 text-left group relative ${
+                          isSelected 
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-semibold' 
+                            : 'hover:bg-white/10 text-slate-300 hover:text-white'
+                        }`}
+                        title={session.title}
+                      >
+                        {/* Compact Session Icon */}
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                          isSelected 
+                            ? 'bg-white text-blue-700' 
+                            : 'bg-white/10 text-slate-300 group-hover:bg-white/20'
+                        }`}>
+                          <MessageSquare size={14} />
+                        </div>
+
+                        {/* Expanded Session Details */}
+                        {isSidebarHovered && (
+                          <div className="flex-1 min-w-0 pr-1">
+                            <p className="text-xs font-medium leading-tight truncate">
+                              {session.title}
+                            </p>
+                            <div className="flex items-center gap-1.5 text-[10px] opacity-75 mt-0.5">
+                              <span>{session.date}</span>
+                              {sessionMember && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate">{sessionMember.shortName}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Delete Session Button (Visible on hover when sidebar is expanded) */}
+                        {isSidebarHovered && sessions.length > 1 && (
+                          <button
+                            onClick={(e) => handleDeleteSession(e, session.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 rounded transition-opacity"
+                            title="Delete Chat"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sidebar Footer: Active Member Profile */}
+                <div className="p-2 border-t border-white/10 bg-slate-950/60 flex items-center gap-2.5 flex-shrink-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0 shadow-md`}>
+                    {activeMember.avatar}
+                  </div>
+                  {isSidebarHovered && (
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate leading-tight text-white">{activeMember.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono leading-tight">{activeMember.id}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {currentMessages.map((msg, index) => {
-                const isEscalationBoundary = escalated && msg.sender === 'agent' && currentMessages[index - 1]?.sender !== 'agent';
+              {/* MAIN CONTENT AREA: Shifted slightly to accommodate the slim 56px sidebar rail */}
+              <div className="flex-1 flex flex-col min-w-0 pl-14 overflow-hidden">
                 
-                return (
-                  <React.Fragment key={`msg-${msg.id}-${index}`}>
-                    {isEscalationBoundary && (
-                      <div className="flex flex-col items-center my-4 select-none">
-                        <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-500/20 backdrop-blur-md border border-purple-400/30 rounded-full shadow-sm">
-                          <AlertTriangle size={14} className="text-purple-800" />
-                          <span className="text-xs font-bold text-purple-900 uppercase tracking-wider">
-                            Escalated to Human HR Representative
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    <MessageBubble 
-                      msg={msg} 
-                      onSelectSuggestion={handleSelectSuggestion} 
-                    />
-                  </React.Fragment>
-                );
-              })}
-              
-              {botIsTyping && (
-                <div className="flex flex-col items-start animate-in fade-in zoom-in duration-300">
-                  <span className="text-xs font-bold text-slate-800 drop-shadow-md mb-1 ml-2 uppercase tracking-wider">
-                    {escalated ? 'Sarah Jenkins • HR' : 'HR AI Copilot'}
-                  </span>
-                  <div className="px-4 py-3 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] bg-white/70 border border-white/80 backdrop-blur-2xl rounded-bl-sm flex gap-1.5 items-center">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                {/* PERSONA TABS: Team Members with ID, Name & Role */}
+                <div className="bg-slate-100/90 border-b border-slate-200 px-3 py-2 flex-shrink-0">
+                  <div className="flex items-center justify-between mb-1 px-1">
+                    <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1">
+                      <Users size={11} /> Switch Persona
+                    </span>
+                    <span className="text-[10px] text-blue-600 font-semibold truncate max-w-[150px]">
+                      {activeMember.program}
+                    </span>
+                  </div>
+
+                  {/* Horizontally Scrollable Team Tabs */}
+                  <div 
+                    className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {TEAM_MEMBERS.map((member) => {
+                      const isActive = member.id === selectedMemberId;
+                      return (
+                        <button
+                          key={member.id}
+                          onClick={() => handleSelectMember(member.id)}
+                          className={`flex-shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-2xl transition-all duration-200 border text-left ${
+                            isActive
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/25 scale-[1.01]'
+                              : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200 shadow-sm'
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[9px] shadow-sm ${
+                            isActive 
+                              ? 'bg-white text-blue-700' 
+                              : `bg-gradient-to-tr ${member.color} text-white`
+                          }`}>
+                            {member.avatar}
+                          </div>
+
+                          <div className="flex flex-col pr-1">
+                            <span className="text-xs font-bold leading-tight truncate max-w-[100px]">
+                              {member.name}
+                            </span>
+                            <div className="flex items-center gap-1 text-[9px] opacity-85 leading-tight">
+                              <span className="font-mono">{member.id}</span>
+                              <span>•</span>
+                              <span className={isActive ? 'text-blue-100 font-semibold' : 'text-slate-500'}>
+                                {member.role}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
 
-              <div ref={messagesEndRef} />
+                {/* HR Manager Note Badge */}
+                {role === 'HR Manager' && (
+                  <div className="px-4 py-1.5 bg-purple-500/15 text-purple-900 font-semibold text-xs border-b border-purple-200/50 flex items-center gap-2 flex-shrink-0">
+                    <Shield size={13} strokeWidth={2.5} className="text-purple-700" />
+                    Viewing administrative records for {activeMember.name} ({activeMember.id})
+                  </div>
+                )}
+
+                {/* Chat History Messages Stream */}
+                <div 
+                  className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 scroll-smooth"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  <style>{`div::-webkit-scrollbar { display: none; }`}</style>
+                  
+                  {/* Persona Context Badge inside Chat */}
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="px-3.5 py-1 bg-white/75 backdrop-blur-md rounded-full border border-slate-200 text-xs text-slate-600 shadow-sm flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-blue-600" />
+                      Active Session: <strong className="text-slate-800">{currentSession.title}</strong> • {activeMember.shortName}
+                    </div>
+                  </div>
+
+                  {currentMessages.map((msg, index) => {
+                    const isEscalationBoundary = escalated && msg.sender === 'agent' && currentMessages[index - 1]?.sender !== 'agent';
+                    
+                    return (
+                      <React.Fragment key={`msg-${msg.id}-${index}`}>
+                        {isEscalationBoundary && (
+                          <div className="flex flex-col items-center my-4 select-none">
+                            <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-500/20 backdrop-blur-md border border-purple-400/30 rounded-full shadow-sm">
+                              <AlertTriangle size={14} className="text-purple-800" />
+                              <span className="text-xs font-bold text-purple-900 uppercase tracking-wider">
+                                Escalated to Human HR Representative
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <MessageBubble 
+                          msg={msg} 
+                          onSelectSuggestion={handleSelectSuggestion} 
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+                  
+                  {botIsTyping && (
+                    <div className="flex flex-col items-start animate-in fade-in zoom-in duration-300">
+                      <span className="text-xs font-bold text-slate-800 drop-shadow-md mb-1 ml-2 uppercase tracking-wider">
+                        {escalated ? 'Sarah Jenkins • HR' : 'HR AI Copilot'}
+                      </span>
+                      <div className="px-4 py-3 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] bg-white/70 border border-white/80 backdrop-blur-2xl rounded-bl-sm flex gap-1.5 items-center">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+              </div>
             </div>
 
           </div>
