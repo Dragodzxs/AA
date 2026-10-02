@@ -41,8 +41,8 @@ export const BACKEND_CONFIG = {
   apiUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000/api/chat',
   // Set to true to bypass backend and use local mock; set to false to prefer real backend
   forceMock: false,
-  // Timeout in milliseconds before falling back to local response (25s for LLM inference)
-  timeoutMs: 25000,
+  // Timeout in milliseconds before falling back to local response (45s for LLM inference)
+  timeoutMs: 45000,
 };
 
 /**

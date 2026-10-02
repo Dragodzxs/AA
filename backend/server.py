@@ -21,7 +21,7 @@ import os
 import sys
 import urllib.request
 import urllib.error
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = 8000
 
@@ -246,33 +246,39 @@ class HRRequestHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept")
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.send_header("Connection", "close")
 
     def do_OPTIONS(self):
         """Handles CORS preflight requests from browser."""
-        self.send_response(204)
+        self.send_response(200)
         self._send_cors_headers()
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):
         """Health check endpoint."""
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self._send_cors_headers()
-        self.end_headers()
         payload = {
             "status": "online",
             "service": "Enterprise HR Copilot Python Backend",
             "team": "Glitch Theory (#279)",
             "geminiEnabled": bool(GEMINI_API_KEY)
         }
-        self.wfile.write(json.dumps(payload).encode("utf-8"))
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self._send_cors_headers()
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self):
         """Chat inference endpoint."""
         if self.path != "/api/chat":
             self.send_response(404)
             self._send_cors_headers()
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
 
@@ -291,26 +297,30 @@ class HRRequestHandler(BaseHTTPRequestHandler):
             # Ensure response has required fields
             response_data["isRealBackend"] = True
             
+            resp_bytes = json.dumps(response_data).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._send_cors_headers()
+            self.send_header("Content-Length", str(len(resp_bytes)))
             self.end_headers()
-            self.wfile.write(json.dumps(response_data).encode("utf-8"))
-            print(f"[POST /api/chat] Responded to {employee_info.get('name')}: '{user_message[:30]}...'")
+            self.wfile.write(resp_bytes)
+            print(f"[POST /api/chat] Responded to {employee_info.get('name')}: '{user_message[:30]}' -> {response_data.get('backendSource')}")
 
         except Exception as e:
+            err_payload = {"error": str(e), "text": f"Backend internal error: {e}"}
+            err_bytes = json.dumps(err_payload).encode("utf-8")
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self._send_cors_headers()
+            self.send_header("Content-Length", str(len(err_bytes)))
             self.end_headers()
-            err_payload = {"error": str(e), "text": "Backend error processing request."}
-            self.wfile.write(json.dumps(err_payload).encode("utf-8"))
+            self.wfile.write(err_bytes)
 
 def run():
     server_address = ("0.0.0.0", PORT)
-    httpd = HTTPServer(server_address, HRRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, HRRequestHandler)
     print(f"===============================================================")
-    print(f"🚀 Python HR Copilot Backend running on http://localhost:{PORT}")
+    print(f"🚀 Threaded HR Copilot Backend running on http://localhost:{PORT}")
     print(f"API Endpoint: http://127.0.0.1:{PORT}/api/chat")
     print(f"Gemini API: {'ACTIVE' if GEMINI_API_KEY else 'MOCK/FAQ ENGINE (No API Key Required)'}")
     print(f"===============================================================")
