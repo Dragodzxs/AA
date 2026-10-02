@@ -243,12 +243,15 @@ def match_policy_response(user_message, employee_info):
     }
 
 class HRRequestHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Access-Control-Max-Age", "86400")
-        self.send_header("Connection", "close")
+        self.send_header("Connection", "keep-alive")
 
     def do_OPTIONS(self):
         """Handles CORS preflight requests from browser."""
