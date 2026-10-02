@@ -136,18 +136,32 @@ def query_gemini_ai(user_message, employee_info, history):
 
 def match_policy_response(user_message, employee_info):
     """Fallback intelligent policy matcher."""
-    text_lower = user_message.lower()
+    text_lower = user_message.lower().strip()
+    emp_name = employee_info.get("name", "Employee")
+    emp_id = employee_info.get("id", "EMP-XXXX")
+    first_name = emp_name.split()[0]
+
+    # 1. Natural greeting matching
+    if any(text_lower == g or text_lower.startswith(g + " ") or text_lower.startswith(g + "!") for g in ["hello", "hi", "hey", "greetings", "good morning", "good afternoon"]):
+        return {
+            "text": f"Hello {first_name}! I am your Enterprise HR Assistant. How can I assist you today? You can ask me about our hybrid/WFH policy, your leave balance, expense reimbursements, or health insurance.",
+            "citations": ["Employee Welcome Portal 2026", "HR Quick Guide Sec. 1"],
+            "suggestions": [
+                "What is our WFH core hours policy?",
+                "Check my remaining leave balance",
+                "How to claim equipment reimbursement?"
+            ],
+            "escalated": False,
+            "agentName": None,
+            "backendSource": "Python Local Engine (Port 8000)"
+        }
 
     for item in FAQ_KNOWLEDGE_BASE:
         for kw in item["keywords"]:
             if kw in text_lower:
-                emp_name = employee_info.get("name", "Employee")
-                emp_id = employee_info.get("id", "EMP-XXXX")
-                
-                # Contextualize answer for employee
                 customized_answer = item["answer"]
                 if item.get("escalated"):
-                    customized_answer = f"Hi {emp_name.split()[0]}, I have escalated your session to Sarah Jenkins from Human Resources for employee file #{emp_id}. She is reviewing your inquiry now."
+                    customized_answer = f"Hi {first_name}, I have escalated your session to Sarah Jenkins from Human Resources for employee file #{emp_id}. She is reviewing your inquiry now."
 
                 return {
                     "text": customized_answer,
@@ -159,11 +173,9 @@ def match_policy_response(user_message, employee_info):
                 }
 
     # Default policy response
-    emp_name = employee_info.get("name", "Employee")
-    emp_id = employee_info.get("id", "EMP-XXXX")
     return {
-        "text": f"Thank you for your question regarding '{user_message}', {emp_name}. I have verified your record ({emp_id}) against our centralized policy repository.",
-        "citations": ["Corporate Code of Conduct Sec. 2", "Enterprise FAQ Guidelines 2026"],
+        "text": f"Regarding '{user_message}', according to the Enterprise Policy Guidelines for {emp_name} ({emp_id}), all standard requests are processed through your self-service dashboard within 24 business hours. If you need special authorization, you can request manager approval or connect with HR.",
+        "citations": ["Enterprise Policy Guidelines 2026", "HR Operations SLA Sec. 3"],
         "suggestions": [
             "What is our WFH core hours policy?",
             "Check my remaining leave balance",
@@ -217,12 +229,17 @@ class HRRequestHandler(BaseHTTPRequestHandler):
             employee_info = data.get("employee", {})
             history = data.get("history", [])
 
-            # 1. Try Gemini AI if API key is provided
-            response_data = query_gemini_ai(user_message, employee_info, history)
+            text_lower = user_message.lower().strip()
+            is_greeting = any(text_lower == g or text_lower.startswith(g + " ") or text_lower.startswith(g + "!") for g in ["hello", "hi", "hey", "greetings", "good morning", "good afternoon"])
 
-            # 2. Fall back to intelligent policy matcher if no Gemini API key
-            if not response_data:
+            # 1. Immediate instant response for greetings
+            if is_greeting:
                 response_data = match_policy_response(user_message, employee_info)
+            else:
+                # 2. Query Gemini AI for policy questions
+                response_data = query_gemini_ai(user_message, employee_info, history)
+                if not response_data:
+                    response_data = match_policy_response(user_message, employee_info)
 
             # Ensure response has required fields
             response_data["isRealBackend"] = True

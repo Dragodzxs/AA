@@ -41,8 +41,8 @@ export const BACKEND_CONFIG = {
   apiUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000/api/chat',
   // Set to true to bypass backend and use local mock; set to false to prefer real backend
   forceMock: false,
-  // Timeout in milliseconds before falling back to local response
-  timeoutMs: 5000,
+  // Timeout in milliseconds before falling back to local response (25s for LLM inference)
+  timeoutMs: 25000,
 };
 
 /**
@@ -80,7 +80,6 @@ export async function sendChatMessage({ text, member, history = [] }) {
 
       if (response.ok) {
         const data = await response.json();
-        // Return normalized backend response so UI never breaks
         return {
           text: data.text || data.message || data.response || 'No response from server.',
           citations: Array.isArray(data.citations) ? data.citations : [],
@@ -91,7 +90,7 @@ export async function sendChatMessage({ text, member, history = [] }) {
         };
       }
     } catch (err) {
-      console.warn('[ChatService] Real backend unreachable, using intelligent mock fallback:', err.message);
+      console.warn('[ChatService] Backend request pending/fallback:', err.message);
     }
   }
 
@@ -104,10 +103,25 @@ export async function sendChatMessage({ text, member, history = [] }) {
  * Provides realistic responses matching the Microsoft Innovate 2026 problem statement.
  */
 function generateMockResponse(queryText, member) {
-  const lower = queryText.toLowerCase();
+  const lower = queryText.toLowerCase().trim();
   const shortName = member.shortName || member.name.split(' ')[0];
 
-  // 1. Human Escalation Trigger
+  // 1. Natural Conversational Greeting
+  if (['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon'].some(g => lower === g || lower.startsWith(g + ' ') || lower.startsWith(g + '!'))) {
+    return {
+      text: `Hello ${shortName}! I am your Enterprise HR Assistant. How can I assist you today? You can ask me about our hybrid/WFH policy, your leave balance, expense reimbursements, or insurance benefits.`,
+      citations: ['Employee Welcome Portal 2026', 'HR Quick Guide Sec. 1'],
+      suggestions: [
+        'What is our WFH core hours policy?',
+        'Check my remaining leave balance',
+        'How to claim equipment reimbursement?'
+      ],
+      escalated: false,
+      isRealBackend: false,
+    };
+  }
+
+  // 2. Human Escalation Trigger
   if (lower.includes('escalate') || lower.includes('human') || lower.includes('sarah') || lower.includes('agent')) {
     return {
       text: `Hi ${shortName}, I am Sarah from Human Resources. I've taken over this chat for Employee record #${member.id}. How can I assist you with your specific query?`,
@@ -123,7 +137,7 @@ function generateMockResponse(queryText, member) {
     };
   }
 
-  // 2. WFH & Remote Work Policy
+  // 3. WFH & Remote Work Policy
   if (lower.includes('wfh') || lower.includes('remote') || lower.includes('home')) {
     return {
       text: `Under the Enterprise Remote Work Policy, full-time staff can work remotely up to 3 days/week with core synchronous hours between 10:00 AM and 3:00 PM.`,
@@ -138,7 +152,7 @@ function generateMockResponse(queryText, member) {
     };
   }
 
-  // 3. Leave & Vacation Balance
+  // 4. Leave & Vacation Balance
   if (lower.includes('leave') || lower.includes('vacation') || lower.includes('holiday') || lower.includes('pto')) {
     return {
       text: `${member.name}, your employee file (${member.id}) shows 14 remaining paid leave days. Planned leaves over 2 consecutive days require manager sign-off in the HR portal.`,
@@ -153,7 +167,7 @@ function generateMockResponse(queryText, member) {
     };
   }
 
-  // 4. Reimbursement, Grants & Allowances
+  // 5. Reimbursement, Grants & Allowances
   if (lower.includes('reimburse') || lower.includes('allowance') || lower.includes('grant') || lower.includes('expense') || lower.includes('hardware')) {
     return {
       text: `Employees under policy tier ${member.id} are eligible for up to ₹5,000 in workstation and wellness reimbursements upon submitting valid receipts through the finance portal.`,
@@ -168,10 +182,10 @@ function generateMockResponse(queryText, member) {
     };
   }
 
-  // 5. Default Policy FAQ
+  // 6. Helpful Contextual Policy Answer
   return {
-    text: `I have logged your inquiry regarding "${queryText}" for ${member.name} (${member.id}). All responses are verified against our centralized policy repository.`,
-    citations: ['Enterprise FAQ Sec. 2', 'Corporate Code of Conduct'],
+    text: `Regarding "${queryText}", according to the Enterprise Policy Guidelines for ${member.name} (${member.id}), all standard requests are processed through your self-service dashboard within 24 business hours. If you need special authorization, you can request manager approval or connect with HR.`,
+    citations: ['Enterprise Policy Guidelines 2026', 'HR Operations SLA'],
     suggestions: [
       'What is our WFH core hours policy?',
       'Check my remaining leave balance',
