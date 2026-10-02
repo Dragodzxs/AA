@@ -86,6 +86,8 @@ export async function sendChatMessage({ text, member, history = [] }) {
           suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
           escalated: Boolean(data.escalated || data.escalate),
           agentName: data.agentName || (data.escalated ? 'Sarah Jenkins' : null),
+          backendSource: data.backendSource || 'Enterprise HR Copilot',
+          isGemini: Boolean(data.isGemini),
           isRealBackend: true,
         };
       }

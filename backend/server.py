@@ -93,46 +93,78 @@ FAQ_KNOWLEDGE_BASE = [
 ]
 
 def query_gemini_ai(user_message, employee_info, history):
-    """Calls Google Gemini API via standard library if API key is present."""
+    """Calls Google Gemini API with fallback models if API key is present."""
     if not GEMINI_API_KEY:
         return None
 
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
-        system_instruction = (
-            "You are the Enterprise HR Copilot for Team Glitch Theory (#279) at Microsoft Innovate 2026 hackathon. "
-            f"You are speaking with employee {employee_info.get('name')} ({employee_info.get('id')}). "
-            "Provide helpful, concise, policy-grounded answers (max 2-3 sentences). "
-            "Always include 2 verified policy citations and 3 suggested follow-up questions. "
-            "You MUST output valid JSON only in this exact format: "
-            '{"text": "your response here", "citations": ["Policy Name 1", "Handbook Sec X"], "suggestions": ["Follow-up Q1", "Follow-up Q2", "Follow-up Q3"], "escalated": false}'
-        )
+    # Preferred reliable models in order
+    candidate_models = [
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash"
+    ]
 
-        prompt = f"Employee Question: {user_message}\nRecent History: {json.dumps(history[-3:])}"
-        payload = {
-            "contents": [{"parts": [{"text": f"{system_instruction}\n\n{prompt}"}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "thinkingConfig": {"thinkingBudget": 0}
+    emp_name = employee_info.get("name", "Alex Morgan")
+    emp_id = employee_info.get("id", "EMP-1042")
+
+    system_instruction = (
+        "You are the Enterprise HR Copilot for Team Glitch Theory (#279) at Microsoft Innovate 2026 hackathon. "
+        f"You are speaking with employee {emp_name} ({emp_id}). "
+        "Answer naturally, warmly, and professionally based on enterprise HR policies. "
+        "Keep answers concise (2 to 4 sentences). "
+        "Always provide 2-3 relevant policy citations and 3 suggested follow-up questions. "
+        "Output ONLY a raw valid JSON object with this exact structure: "
+        '{"text": "your direct answer", "citations": ["Policy citation 1", "Policy citation 2"], "suggestions": ["Follow-up Q1", "Follow-up Q2", "Follow-up Q3"], "escalated": false}'
+    )
+
+    prompt = f"Employee Question: {user_message}\nRecent History: {json.dumps(history[-3:] if history else [])}"
+
+    for model_name in candidate_models:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": f"{system_instruction}\n\n{prompt}"}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "maxOutputTokens": 600
+                }
             }
-        }
 
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
 
-        with urllib.request.urlopen(req, timeout=10) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            candidate = result["candidates"][0]["content"]["parts"][0]["text"]
-            parsed = json.loads(candidate)
-            parsed["backendSource"] = "Google Gemini 3.8 Flash (Live Cloud AI)"
-            return parsed
-    except Exception as e:
-        print(f"[Gemini AI] {e}, using local policy matcher fallback.", file=sys.stderr)
-        return None
+            with urllib.request.urlopen(req, timeout=22) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+                
+                # Robust JSON extraction: find outermost curly braces
+                start_idx = raw_text.find("{")
+                end_idx = raw_text.rfind("}")
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    json_str = raw_text[start_idx:end_idx+1]
+                    parsed = json.loads(json_str)
+                else:
+                    parsed = json.loads(raw_text)
+
+                parsed["backendSource"] = f"Google {model_name} (Live AI)"
+                parsed["isGemini"] = True
+                print(f"[Gemini SUCCESS] Responded via {model_name}")
+                return parsed
+        except Exception as e:
+            print(f"[Gemini {model_name}] error: {e}, trying next candidate...", file=sys.stderr)
+            continue
+
+    return None
 
 def match_policy_response(user_message, employee_info):
     """Fallback intelligent policy matcher."""
@@ -229,17 +261,14 @@ class HRRequestHandler(BaseHTTPRequestHandler):
             employee_info = data.get("employee", {})
             history = data.get("history", [])
 
-            text_lower = user_message.lower().strip()
-            is_greeting = any(text_lower == g or text_lower.startswith(g + " ") or text_lower.startswith(g + "!") for g in ["hello", "hi", "hey", "greetings", "good morning", "good afternoon"])
-
-            # 1. Immediate instant response for greetings
-            if is_greeting:
-                response_data = match_policy_response(user_message, employee_info)
-            else:
-                # 2. Query Gemini AI for policy questions
+            # 1. Query Gemini AI first if configured (even for greetings and complex questions)
+            response_data = None
+            if GEMINI_API_KEY:
                 response_data = query_gemini_ai(user_message, employee_info, history)
-                if not response_data:
-                    response_data = match_policy_response(user_message, employee_info)
+
+            # 2. Fall back to local policy FAQ matcher if Gemini is unavailable or not configured
+            if not response_data:
+                response_data = match_policy_response(user_message, employee_info)
 
             # Ensure response has required fields
             response_data["isRealBackend"] = True

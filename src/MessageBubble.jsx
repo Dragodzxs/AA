@@ -15,10 +15,22 @@ export const MessageBubble = ({ msg, onSelectSuggestion }) => {
       )}
       
       {isBot && (
-        <span className="text-xs font-bold text-slate-600 mb-1 ml-2 uppercase tracking-wider flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-          Enterprise HR Copilot
-        </span>
+        <div className="flex items-center gap-2 mb-1 ml-2 flex-wrap">
+          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            Enterprise HR Copilot
+          </span>
+          {msg.backendSource && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border shadow-xs ${
+              msg.backendSource.includes('Gemini') || msg.isGemini
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400/40 shadow-blue-500/20'
+                : 'bg-slate-100 text-slate-700 border-slate-300'
+            }`}>
+              <Sparkles size={10} className={msg.backendSource.includes('Gemini') || msg.isGemini ? 'text-amber-300 animate-spin-slow' : 'text-slate-500'} />
+              {msg.backendSource}
+            </span>
+          )}
+        </div>
       )}
       
       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[92%]`}>
