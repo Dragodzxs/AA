@@ -24,7 +24,17 @@ import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = 8000
+
+# Load GEMINI_API_KEY from environment or .env file
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+if not GEMINI_API_KEY:
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if line.startswith("GEMINI_API_KEY="):
+                    GEMINI_API_KEY = line.split("=", 1)[1].strip()
+                    break
 
 # Centralized Policy Knowledge Base (Microsoft Innovate 2026 FAQ)
 FAQ_KNOWLEDGE_BASE = [
@@ -88,19 +98,23 @@ def query_gemini_ai(user_message, employee_info, history):
         return None
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
         system_instruction = (
             "You are the Enterprise HR Copilot for Team Glitch Theory (#279) at Microsoft Innovate 2026 hackathon. "
             f"You are speaking with employee {employee_info.get('name')} ({employee_info.get('id')}). "
-            "Provide helpful, concise, policy-grounded answers. "
-            "You must output valid JSON only in this exact format: "
+            "Provide helpful, concise, policy-grounded answers (max 2-3 sentences). "
+            "Always include 2 verified policy citations and 3 suggested follow-up questions. "
+            "You MUST output valid JSON only in this exact format: "
             '{"text": "your response here", "citations": ["Policy Name 1", "Handbook Sec X"], "suggestions": ["Follow-up Q1", "Follow-up Q2", "Follow-up Q3"], "escalated": false}'
         )
 
-        prompt = f"Employee Question: {user_message}\nConversation History: {json.dumps(history)}"
+        prompt = f"Employee Question: {user_message}\nRecent History: {json.dumps(history[-3:])}"
         payload = {
             "contents": [{"parts": [{"text": f"{system_instruction}\n\n{prompt}"}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "thinkingConfig": {"thinkingBudget": 0}
+            }
         }
 
         req = urllib.request.Request(
@@ -110,13 +124,14 @@ def query_gemini_ai(user_message, employee_info, history):
             method="POST"
         )
 
-        with urllib.request.urlopen(req, timeout=6) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             result = json.loads(response.read().decode("utf-8"))
             candidate = result["candidates"][0]["content"]["parts"][0]["text"]
             parsed = json.loads(candidate)
+            parsed["backendSource"] = "Google Gemini 3.8 Flash (Live Cloud AI)"
             return parsed
     except Exception as e:
-        print(f"[Gemini AI] Call failed or timed out ({e}), using local policy matcher fallback.", file=sys.stderr)
+        print(f"[Gemini AI] {e}, using local policy matcher fallback.", file=sys.stderr)
         return None
 
 def match_policy_response(user_message, employee_info):
