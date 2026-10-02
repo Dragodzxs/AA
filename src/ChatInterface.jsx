@@ -23,6 +23,7 @@ import {
 import { AuthModal } from './AuthModal';
 import { MessageBubble } from './MessageBubble';
 import { TEAM_MEMBERS } from './teamData';
+import { sendChatMessage } from './chatService';
 
 const INITIAL_SESSIONS = [
   {
@@ -73,7 +74,7 @@ const INITIAL_SESSIONS = [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Sarah, I am your Enterprise HR Assistant. Your annual performance review check-in is logged and your medical insurance benefits are active. How can HR assist you today with team leave approvals or workplace guidelines?',
+        text: 'Hello Sarah, I am your Enterprise HR Assistant. Your annual performance review check-in is logged and your medical insurance benefits are active.',
         timestamp: 'Yesterday, 04:15 PM',
         citations: ['Team Management Guide 2026', 'Health & Insurance Policy'],
         suggestions: [
@@ -92,7 +93,7 @@ const INITIAL_SESSIONS = [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Jordan, I am your Enterprise HR Assistant. Your cloud workspace allowance and workstation grant are verified. What company policies, leave guidelines, or allowances can I clarify for you today?',
+        text: 'Hello Jordan, I am your Enterprise HR Assistant. Your cloud workspace allowance and workstation grant are verified.',
         timestamp: 'Sep 29, 02:30 PM',
         citations: ['Cloud Reimbursement Policy', 'Security Access Guidelines'],
         suggestions: [
@@ -129,7 +130,7 @@ const ChatInterface = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState(TEAM_MEMBERS[0].id);
   
-  // Start minimized in 'input' mode so chat is NOT wide open upon site visit!
+  // Starts in 'input' mode so chat is docked cleanly on initial page load
   const [displayMode, setDisplayMode] = useState('input');
   
   // Hover Sidebar State
@@ -164,12 +165,11 @@ const ChatInterface = () => {
     }
   }, [currentMessages, botIsTyping, displayMode]);
 
-  // When a persona tab is clicked, update active member & start/find their session
+  // When a persona tab is clicked, update active member & session
   const handleSelectMember = (memberId) => {
     setSelectedMemberId(memberId);
     const memberObj = TEAM_MEMBERS.find(m => m.id === memberId);
     
-    // Check if an existing session belongs to this member, else create one
     const existingSession = sessions.find(s => s.memberId === memberId);
     if (existingSession) {
       setCurrentSessionId(existingSession.id);
@@ -250,125 +250,28 @@ const ChatInterface = () => {
     }
   };
 
-  const processQueryResponse = (queryText) => {
-    const lower = queryText.toLowerCase();
-    let responseText = '';
-    let citations = [];
-    let followUpSuggestions = [];
-
-    if (lower.includes('escalate') || lower.includes('human') || lower.includes('sarah') || lower.includes('agent')) {
-      setEscalated(true);
-      responseText = `Hi ${activeMember.shortName}, I am Sarah from Human Resources. I've taken over this chat for Employee record #${activeMember.id}. How can I assist you with your specific query?`;
-      citations = ['Direct HR Representative Hand-off'];
-      followUpSuggestions = [
-        'Review my grievance ticket',
-        'Schedule a 1-on-1 HR call',
-        'Confidential policy inquiry'
-      ];
-
-      setSessions(prev => prev.map(s => {
-        if (s.id !== currentSessionId) return s;
-        return {
-          ...s,
-          messages: [
-            ...s.messages,
-            {
-              id: s.messages.length + 2,
-              sender: 'agent',
-              agentName: 'Sarah Jenkins',
-              text: responseText,
-              citations: citations,
-              suggestions: followUpSuggestions,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]
-        };
-      }));
-      setBotIsTyping(false);
-      return;
-    }
-
-    if (lower.includes('wfh') || lower.includes('remote') || lower.includes('home')) {
-      responseText = `Under the Enterprise Remote Work Policy, full-time staff can work remotely up to 3 days/week with core synchronous hours between 10:00 AM and 3:00 PM.`;
-      citations = ['Remote Work Policy 2026', 'Employee Handbook Sec. 4'];
-      followUpSuggestions = [
-        'Who approves my remote work days?',
-        'Can I work remotely during client projects?',
-        'What equipment allowance do I get?'
-      ];
-    } else if (lower.includes('leave') || lower.includes('vacation') || lower.includes('holiday')) {
-      responseText = `${activeMember.name}, your employee file (${activeMember.id}) shows 14 remaining paid leave days. Planned leaves over 2 consecutive days require manager sign-off in the HR portal.`;
-      citations = ['Annual Leave Guidelines', 'Manager Approval Matrix'];
-      followUpSuggestions = [
-        'How do I submit sick leave?',
-        'View annual holiday calendar',
-        'Can leave be carried over to next year?'
-      ];
-    } else if (lower.includes('reimburse') || lower.includes('allowance') || lower.includes('grant') || lower.includes('expense')) {
-      responseText = `Employees under policy tier ${activeMember.id} are eligible for up to ₹5,000 in workstation and wellness reimbursements upon submitting valid receipts through the finance portal.`;
-      citations = ['Workplace Wellness Memo', 'Corporate Travel & Expense Policy'];
-      followUpSuggestions = [
-        'Where do I upload invoice receipts?',
-        'Are internet & mobile bills covered?',
-        'Reimbursement payment timeline'
-      ];
-    } else {
-      responseText = `I have logged your inquiry regarding "${queryText}" for ${activeMember.name} (${activeMember.id}). All responses are verified against our centralized policy repository.`;
-      citations = ['Enterprise FAQ Sec. 2', 'Corporate Code of Conduct'];
-      followUpSuggestions = [
-        'What is our WFH core hours policy?',
-        'Check my remaining leave balance',
-        'Escalate to Human HR'
-      ];
-    }
-
-    setSessions(prev => prev.map(s => {
-      if (s.id !== currentSessionId) return s;
-      
-      let newTitle = s.title;
-      if (s.title.startsWith('New Query') || s.title.startsWith('HR Chat')) {
-        newTitle = queryText.length > 28 ? `${queryText.slice(0, 28)}...` : queryText;
-      }
-
-      return {
-        ...s,
-        title: newTitle,
-        messages: [
-          ...s.messages,
-          {
-            id: s.messages.length + 2,
-            sender: 'bot',
-            text: responseText,
-            citations: citations,
-            suggestions: followUpSuggestions,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]
-      };
-    }));
-    setBotIsTyping(false);
-  };
-
-  const handleSendText = (textToSend) => {
+  // Send message - Fully powered by chatService (backend rules it all!)
+  const handleSendText = async (textToSend) => {
     if (!textToSend.trim()) return;
 
-    const newMessage = {
+    const userMessage = {
       id: currentMessages.length + 1,
       sender: 'user',
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
+    // 1. Add user message to current session
     setSessions(prev => prev.map(s => {
       if (s.id !== currentSessionId) return s;
       return {
         ...s,
-        messages: [...s.messages, newMessage]
+        messages: [...s.messages, userMessage]
       };
     }));
     setInputValue('');
 
-    // Open window automatically when user sends message
+    // Open window automatically if minimized
     if (displayMode === 'input') {
       setDisplayMode('window');
     }
@@ -376,9 +279,50 @@ const ChatInterface = () => {
     if (escalated) return;
 
     setBotIsTyping(true);
-    setTimeout(() => {
-      processQueryResponse(textToSend);
-    }, 1100);
+
+    try {
+      // 2. Query backend service (falls back gracefully to smart mock if backend is down)
+      const botResponse = await sendChatMessage({
+        text: textToSend,
+        member: activeMember,
+        history: [...currentMessages, userMessage],
+      });
+
+      if (botResponse.escalated) {
+        setEscalated(true);
+      }
+
+      // 3. Update session with exact data provided by backend
+      setSessions(prev => prev.map(s => {
+        if (s.id !== currentSessionId) return s;
+
+        let newTitle = s.title;
+        if (s.title.startsWith('New Query') || s.title.startsWith('HR Chat')) {
+          newTitle = textToSend.length > 28 ? `${textToSend.slice(0, 28)}...` : textToSend;
+        }
+
+        return {
+          ...s,
+          title: newTitle,
+          messages: [
+            ...s.messages,
+            {
+              id: s.messages.length + 2,
+              sender: botResponse.escalated ? 'agent' : 'bot',
+              agentName: botResponse.agentName || 'Sarah Jenkins',
+              text: botResponse.text,
+              citations: botResponse.citations || [],
+              suggestions: botResponse.suggestions || [],
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        };
+      }));
+    } catch (err) {
+      console.error('Error in sendChatMessage:', err);
+    } finally {
+      setBotIsTyping(false);
+    }
   };
 
   const handleSend = () => {
@@ -390,7 +334,7 @@ const ChatInterface = () => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleSend();
     }
@@ -409,7 +353,7 @@ const ChatInterface = () => {
         />
       )}
 
-      {/* Main Dynamic Container */}
+      {/* Main Container */}
       <div 
         className={`font-sans pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isFullscreen 
@@ -429,7 +373,7 @@ const ChatInterface = () => {
           }`}
         >
           {/* Card Glass Body */}
-          <div className="w-full h-full flex flex-col bg-white/85 backdrop-blur-2xl rounded-3xl border border-white/70 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden relative">
+          <div className="w-full h-full flex flex-col bg-white/90 backdrop-blur-2xl rounded-3xl border border-white/70 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden relative">
             
             {/* Top Brand Header */}
             <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-indigo-950/95 backdrop-blur-md text-white flex items-center justify-between border-b border-white/10 flex-shrink-0 z-30">
@@ -619,7 +563,7 @@ const ChatInterface = () => {
                   })}
                 </div>
 
-                {/* Sidebar Footer: Active Member Profile */}
+                {/* Sidebar Footer */}
                 <div className="p-2 border-t border-white/10 bg-slate-950/60 flex items-center gap-2.5 flex-shrink-0">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0 shadow-md`}>
                     {activeMember.avatar}
@@ -636,7 +580,7 @@ const ChatInterface = () => {
               {/* MAIN CONTENT AREA */}
               <div className="flex-1 flex flex-col min-w-0 pl-14 overflow-hidden">
                 
-                {/* PERSONA TABS: Dummy Names & IDs (Alex Morgan, Sarah Chen, etc.) */}
+                {/* PERSONA TABS: Clean Corporate Personas */}
                 <div className="bg-slate-100/90 border-b border-slate-200 px-3 py-2 flex-shrink-0">
                   <div className="flex items-center justify-between mb-1 px-1">
                     <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1">
@@ -647,7 +591,7 @@ const ChatInterface = () => {
                     </span>
                   </div>
 
-                  {/* Horizontally Scrollable Team Tabs */}
+                  {/* Horizontally Scrollable Persona Tabs */}
                   <div 
                     className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -754,39 +698,39 @@ const ChatInterface = () => {
           </div>
         </div>
 
-        {/* TASKBAR / INPUT BAR (Uncut text greeting, clean placeholder, roomy size) */}
+        {/* TASKBAR / INPUT BAR (Clean single-line, NO scrollbars, NO clipped text) */}
         <div className="pointer-events-auto mt-3 w-full flex-shrink-0">
           
-          {/* Helpful greeting prompt shown when input bar is docked (never cut off) */}
+          {/* Welcome greeting banner when docked in input-only mode */}
           {isInputOnly && (
             <div 
               onClick={() => setDisplayMode('window')}
-              className="mb-2 px-4 py-2 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-xl text-white rounded-2xl border border-white/20 shadow-xl cursor-pointer flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 transition-all group"
+              className="mb-2 px-4 py-2.5 bg-slate-900/95 hover:bg-slate-900 backdrop-blur-xl text-white rounded-2xl border border-white/20 shadow-xl cursor-pointer flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 transition-all group"
             >
-              <div className="flex items-center gap-2.5 overflow-hidden">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0 shadow-sm`}>
                   {activeMember.avatar}
                 </div>
-                <p className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors truncate">
+                <p className="text-xs sm:text-[13px] font-medium text-slate-200 group-hover:text-white transition-colors truncate">
                   <span className="font-bold text-white">Hello {activeMember.name},</span> how can HR assist you with leave, WFH, or company policies today?
                 </p>
               </div>
-              <span className="text-[11px] font-semibold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-400/30 whitespace-nowrap flex items-center gap-1">
-                Open Chat <ChevronUp size={12} />
+              <span className="text-[11px] font-semibold text-blue-300 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-400/30 whitespace-nowrap flex items-center gap-1 flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                Open Chat <ChevronUp size={13} />
               </span>
             </div>
           )}
 
           {/* Main Input Bar */}
-          <div className="w-full rounded-2xl p-2.5 flex items-center gap-2.5 bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgb(0,0,0,0.18)] transition-all duration-300">
+          <div className="w-full rounded-2xl p-2 sm:p-2.5 flex items-center gap-2 bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgb(0,0,0,0.18)] transition-all duration-300">
             
-            {/* Mode Switcher Button: Opens or toggles window */}
+            {/* Mode Switcher Button */}
             <button 
               onClick={() => {
                 if (isInputOnly) setDisplayMode('window');
                 else setDisplayMode('input');
               }}
-              className="p-2.5 text-slate-600 hover:text-blue-600 transition-colors flex items-center justify-center rounded-xl hover:bg-slate-100"
+              className="p-2 sm:p-2.5 text-slate-600 hover:text-blue-600 transition-colors flex items-center justify-center rounded-xl hover:bg-slate-100 flex-shrink-0"
               title={isInputOnly ? "Expand Window" : "Minimize to Input Bar"}
             >
               {isInputOnly ? (
@@ -800,45 +744,45 @@ const ChatInterface = () => {
             {!isInputOnly && (
               <button
                 onClick={() => setDisplayMode(isFullscreen ? 'window' : 'fullscreen')}
-                className="p-2.5 text-slate-600 hover:text-blue-600 transition-colors rounded-xl hover:bg-slate-100 hidden sm:flex"
+                className="p-2 text-slate-600 hover:text-blue-600 transition-colors rounded-xl hover:bg-slate-100 hidden sm:flex flex-shrink-0"
                 title={isFullscreen ? "Restore Window" : "Maximize Fullscreen"}
               >
-                {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                {isFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
               </button>
             )}
             
             <button 
-              className="p-2.5 text-slate-600 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-100"
+              className="p-2 text-slate-600 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-100 flex-shrink-0"
               title="Attach File / Screenshot"
             >
-              <Paperclip size={22} strokeWidth={2} />
+              <Paperclip size={20} strokeWidth={2} />
             </button>
             
-            {/* Roomy enlarged input field with natural un-cut placeholder */}
-            <textarea
+            {/* Clean input field with single-line guarantee (NO text wrapping, NO native scrollbars) */}
+            <input
+              type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onFocus={() => {
                 if (isInputOnly) setDisplayMode('window');
               }}
-              placeholder={`Hello ${activeMember.shortName}, ask HR anything (e.g. leave balance, WFH, allowances)...`}
-              className="flex-1 max-h-36 bg-transparent border-none focus:ring-0 resize-none py-2 px-2 text-[15px] sm:text-[16px] text-slate-900 placeholder-slate-500 font-medium min-h-[48px] leading-relaxed"
-              rows="1"
+              placeholder={`Ask HR as ${activeMember.name} (e.g. leave balance, WFH, allowances)...`}
+              className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 py-2.5 px-2 text-[14px] sm:text-[15px] text-slate-900 placeholder-slate-400 font-medium min-w-0"
             />
             
             {/* Enlarged Send Button */}
             <button 
               onClick={handleSend}
               disabled={!inputValue.trim()}
-              className={`p-3 rounded-xl transition-all duration-300 flex items-center justify-center h-12 w-12 flex-shrink-0 ${
+              className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 flex items-center justify-center h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 ${
                 inputValue.trim() 
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-100 hover:scale-105 active:scale-95' 
                   : 'bg-slate-200/80 text-slate-400 cursor-not-allowed'
               }`}
               title="Send Message"
             >
-              <Send size={20} strokeWidth={2.5} className={inputValue.trim() ? "ml-0.5" : ""} />
+              <Send size={19} strokeWidth={2.5} className={inputValue.trim() ? "ml-0.5" : ""} />
             </button>
           </div>
         </div>
