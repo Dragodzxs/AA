@@ -30,17 +30,26 @@ export const MessageBubble = ({ msg, onSelectSuggestion }) => {
               {msg.backendSource}
             </span>
           )}
+          {msg.confidence !== undefined && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border shadow-xs ${
+              msg.confidence >= 90 ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+              msg.confidence >= 70 ? 'bg-amber-100 text-amber-700 border-amber-300' :
+              'bg-rose-100 text-rose-700 border-rose-300'
+            }`}>
+              Confidence: {msg.confidence}%
+            </span>
+          )}
         </div>
       )}
       
       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[92%]`}>
         <div 
-          className={`px-5 py-3.5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-[15.5px] leading-relaxed backdrop-blur-2xl border font-medium ${
+          className={`px-5 py-4 rounded-[22px] shadow-[0_10px_40px_rgb(0,0,0,0.12)] text-[16px] leading-relaxed backdrop-blur-3xl border font-medium ${
             isUser 
-              ? 'bg-blue-600/90 border-blue-500 text-white rounded-br-sm shadow-blue-500/20' 
+              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 border-blue-500/50 text-white rounded-br-sm shadow-[0_8px_25px_rgba(37,99,235,0.25)]' 
               : isAgent
-                ? 'bg-purple-500/25 border-purple-400/40 text-slate-900 rounded-bl-sm shadow-[inset_0_0_20px_rgba(168,85,247,0.15)]'
-                : 'bg-white/85 border-white/70 text-slate-900 rounded-bl-sm shadow-[inset_0_0_20px_rgba(59,130,246,0.08)]'
+                ? 'bg-purple-50/95 border-purple-200 text-slate-900 rounded-bl-sm shadow-[inset_0_0_20px_rgba(168,85,247,0.08)]'
+                : 'bg-white/95 border-white text-slate-900 rounded-bl-sm shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]'
           }`}
         >
           <p className="whitespace-pre-wrap tracking-tight leading-relaxed">{msg.text}</p>

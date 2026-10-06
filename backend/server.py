@@ -21,7 +21,15 @@ import os
 import sys
 import urllib.request
 import urllib.error
+import socket
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+
+# Force IPv4 to prevent IPv6 blackhole timeouts when connecting to Google APIs
+old_getaddrinfo = socket.getaddrinfo
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [response for response in responses if response[0] == socket.AF_INET]
+socket.getaddrinfo = new_getaddrinfo
 
 PORT = 8000
 
@@ -37,60 +45,7 @@ if not GEMINI_API_KEY:
                     break
 
 # Centralized Policy Knowledge Base (Microsoft Innovate 2026 FAQ)
-FAQ_KNOWLEDGE_BASE = [
-    {
-        "keywords": ["wfh", "remote", "home", "hybrid"],
-        "answer": "Under the Bennett Enterprise Remote Policy, full-time staff can work remotely up to 3 days per week. Synchronous core working hours are strictly between 10:00 AM and 3:00 PM.",
-        "citations": ["Remote Work Policy 2026", "Employee Handbook Sec. 4.1"],
-        "suggestions": [
-            "Who approves my remote work schedule?",
-            "Can I work remotely during hackathons?",
-            "What is the home internet allowance?"
-        ]
-    },
-    {
-        "keywords": ["leave", "vacation", "holiday", "pto", "sick", "absence"],
-        "answer": "Your employee record currently shows 14 remaining paid annual leave days. Sick leaves under 2 days require self-certification in the portal, while planned leave over 2 consecutive days requires Team Leader approval.",
-        "citations": ["Annual Leave Policy Sec. 2", "Manager Approval Matrix 2026"],
-        "suggestions": [
-            "How do I apply for casual leave?",
-            "View official company holiday list",
-            "Can unused leaves be carried over to 2027?"
-        ]
-    },
-    {
-        "keywords": ["reimburse", "expense", "hackathon", "grant", "allowance", "hardware", "cloud", "azure"],
-        "answer": "For Microsoft Innovate 2026 (Project #279), team members are eligible for up to ₹5,000 each in verified hardware components, Azure cloud compute credits, and event travel. Submit GST invoices through the finance portal.",
-        "citations": ["Hackathon Innovation Grant Memo #279", "Corporate Travel & Expense Policy"],
-        "suggestions": [
-            "Where do I upload invoice receipts?",
-            "Are cloud API tokens eligible for reimbursement?",
-            "Payment disbursement timeline"
-        ]
-    },
-    {
-        "keywords": ["insurance", "health", "medical", "dental", "hospital", "wellness"],
-        "answer": "All team members are enrolled in the Enterprise Comprehensive Health Cover (up to ₹5,00,000 sum insured per family) with cashless hospitalization across 4,500+ network hospitals.",
-        "citations": ["Corporate Health & Wellness Benefit Sec. 8"],
-        "suggestions": [
-            "Download digital insurance e-card",
-            "List of network empaneled hospitals",
-            "How to submit outpatient medicine bills?"
-        ]
-    },
-    {
-        "keywords": ["escalate", "human", "agent", "sarah", "talk to human", "representative"],
-        "answer": "I have escalated your session to Sarah Jenkins from Human Resources. She will review your employee record and assist you shortly.",
-        "citations": ["HR Service Level Agreement 2026", "Direct Representative Hand-off"],
-        "suggestions": [
-            "Schedule a confidential 1-on-1 call",
-            "Check status of open HR tickets",
-            "Submit employee grievance form"
-        ],
-        "escalated": True,
-        "agentName": "Sarah Jenkins"
-    }
-]
+from database import FAQ_KNOWLEDGE_BASE
 
 def query_gemini_ai(user_message, employee_info, history):
     """Calls Google Gemini API. Returns Gemini response or detailed diagnostic error."""
@@ -104,23 +59,27 @@ def query_gemini_ai(user_message, employee_info, history):
         }
 
     candidate_models = [
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
+        "gemini-flash-lite-latest"
     ]
 
     emp_name = employee_info.get("name", "Alex Morgan")
     emp_id = employee_info.get("id", "EMP-1042")
 
+    policy_context = "\n".join([f"- {item['answer']} (Sources: {', '.join(item['citations'])})" for item in FAQ_KNOWLEDGE_BASE])
+
     system_instruction = (
         "You are the Enterprise HR Copilot for Team Glitch Theory (#279) at Microsoft Innovate 2026 hackathon. "
         f"You are speaking with employee {emp_name} ({emp_id}). "
-        "Answer naturally, warmly, and professionally based on enterprise HR policies. "
-        "Keep answers concise (2 to 4 sentences). "
-        "Always provide 2-3 relevant policy citations and 3 suggested follow-up questions. "
-        "Output ONLY a raw valid JSON object with this exact structure: "
-        '{"text": "your direct answer", "citations": ["Policy citation 1", "Policy citation 2"], "suggestions": ["Follow-up Q1", "Follow-up Q2", "Follow-up Q3"], "escalated": false}'
+        "Answer naturally, warmly, and professionally based strictly on the following enterprise HR policies:\n\n"
+        f"COMPANY POLICY DATABASE:\n{policy_context}\n\n"
+        "You must assign a 'confidence' score (0 to 100) to your answer. "
+        "Score 95-100 if the exact answer is clearly found in the policies. "
+        "Score 70-94 if you can logically infer the answer from the policies. "
+        "Score 0-69 if the question is highly sensitive (harassment, physical violence, legal disputes, etc.), or asks for personal opinions. "
+        "If a user asks how company policy compares to state/national laws, you SHOULD answer by clearly stating the company policy, but add a brief disclaimer that you cannot provide formal legal advice on state laws. Do not artificially lower your confidence just because laws were mentioned. "
+        "If confidence is below 70, you MUST set 'escalated' to true, safely decline to answer, and state that you are escalating to a human representative."
+        "Always provide relevant policy citations and 3 suggested follow-up questions from the database. "
+        "Output ONLY a raw valid JSON object."
     )
 
     prompt = f"Employee Question: {user_message}\nRecent History: {json.dumps(history[-3:] if history else [])}"
@@ -140,7 +99,19 @@ def query_gemini_ai(user_message, employee_info, history):
                 ],
                 "generationConfig": {
                     "temperature": 0.4,
-                    "maxOutputTokens": 600
+                    "maxOutputTokens": 600,
+                    "responseMimeType": "application/json",
+                    "responseSchema": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "text": {"type": "STRING"},
+                            "citations": {"type": "ARRAY", "items": {"type": "STRING"}},
+                            "suggestions": {"type": "ARRAY", "items": {"type": "STRING"}},
+                            "confidence": {"type": "INTEGER"},
+                            "escalated": {"type": "BOOLEAN"}
+                        },
+                        "required": ["text", "citations", "suggestions", "confidence", "escalated"]
+                    }
                 }
             }
 
@@ -166,10 +137,16 @@ def query_gemini_ai(user_message, employee_info, history):
                     parsed = json.loads(json_str)
                 else:
                     parsed = json.loads(raw_text)
+                    
+                # Strict Backend Enforce: Auto-escalate if confidence drops below 70
+                confidence_score = parsed.get("confidence", 100)
+                if confidence_score < 70:
+                    parsed["escalated"] = True
 
                 parsed["backendSource"] = f"Google {model_name} (Live AI)"
                 parsed["isGemini"] = True
-                print(f"[Gemini SUCCESS] Responded via {model_name}")
+                print(f"[Gemini SUCCESS] Responded via {model_name} (Confidence: {confidence_score}%)")
+                print(f"RAW PARSED RESPONSE: {json.dumps(parsed)}")
                 return parsed
         except urllib.error.HTTPError as he:
             err_body = he.read().decode("utf-8", errors="ignore")
@@ -179,68 +156,21 @@ def query_gemini_ai(user_message, employee_info, history):
         except Exception as e:
             last_error = f"Error on {model_name}: {str(e)}"
             print(f"[Gemini {model_name}] error: {e}", file=sys.stderr)
+            try:
+                print(f"[RAW TEXT]: {raw_text}", file=sys.stderr)
+            except:
+                pass
             continue
 
     # Return pure experimental diagnostic directly to the user (NO PREBACKED ANSWERS)
     return {
-        "text": f"⚠️ [Gemini Experiment Mode] Failed to get live Gemini response.\nDetails: {last_error}",
+        "text": f"⚠️ [Enterprise HR Copilot] Backend AI Service Offline.\nDetails: {last_error}",
         "citations": ["Google API Diagnostic", "Zero Prebaked Fallback"],
         "suggestions": ["Check Gemini API Key", "Retry with different query"],
         "backendSource": "Gemini API Error",
         "isGemini": False
     }
 
-def match_policy_response(user_message, employee_info):
-    """Fallback intelligent policy matcher."""
-    text_lower = user_message.lower().strip()
-    emp_name = employee_info.get("name", "Employee")
-    emp_id = employee_info.get("id", "EMP-XXXX")
-    first_name = emp_name.split()[0]
-
-    # 1. Natural greeting matching
-    if any(text_lower == g or text_lower.startswith(g + " ") or text_lower.startswith(g + "!") for g in ["hello", "hi", "hey", "greetings", "good morning", "good afternoon"]):
-        return {
-            "text": f"Hello {first_name}! I am your Enterprise HR Assistant. How can I assist you today? You can ask me about our hybrid/WFH policy, your leave balance, expense reimbursements, or health insurance.",
-            "citations": ["Employee Welcome Portal 2026", "HR Quick Guide Sec. 1"],
-            "suggestions": [
-                "What is our WFH core hours policy?",
-                "Check my remaining leave balance",
-                "How to claim equipment reimbursement?"
-            ],
-            "escalated": False,
-            "agentName": None,
-            "backendSource": "Python Local Engine (Port 8000)"
-        }
-
-    for item in FAQ_KNOWLEDGE_BASE:
-        for kw in item["keywords"]:
-            if kw in text_lower:
-                customized_answer = item["answer"]
-                if item.get("escalated"):
-                    customized_answer = f"Hi {first_name}, I have escalated your session to Sarah Jenkins from Human Resources for employee file #{emp_id}. She is reviewing your inquiry now."
-
-                return {
-                    "text": customized_answer,
-                    "citations": item.get("citations", ["Corporate FAQ 2026"]),
-                    "suggestions": item.get("suggestions", []),
-                    "escalated": item.get("escalated", False),
-                    "agentName": item.get("agentName", None),
-                    "backendSource": "Python Local Engine (Port 8000)"
-                }
-
-    # Default policy response
-    return {
-        "text": f"Regarding '{user_message}', according to the Enterprise Policy Guidelines for {emp_name} ({emp_id}), all standard requests are processed through your self-service dashboard within 24 business hours. If you need special authorization, you can request manager approval or connect with HR.",
-        "citations": ["Enterprise Policy Guidelines 2026", "HR Operations SLA Sec. 3"],
-        "suggestions": [
-            "What is our WFH core hours policy?",
-            "Check my remaining leave balance",
-            "Escalate to Human HR Representative"
-        ],
-        "escalated": False,
-        "agentName": None,
-        "backendSource": "Python Local Engine (Port 8000)"
-    }
 
 class HRRequestHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -278,6 +208,7 @@ class HRRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Chat inference endpoint."""
+        print(f"Received POST request for {self.path}", flush=True)
         if self.path != "/api/chat":
             self.send_response(404)
             self._send_cors_headers()
@@ -287,8 +218,11 @@ class HRRequestHandler(BaseHTTPRequestHandler):
 
         try:
             content_length = int(self.headers.get("Content-Length", 0))
+            print(f"Reading {content_length} bytes...", flush=True)
             body_bytes = self.rfile.read(content_length)
+            print(f"Read {len(body_bytes)} bytes. Decoding JSON...", flush=True)
             data = json.loads(body_bytes.decode("utf-8"))
+            print(f"Calling Gemini with message: {data.get('message')}", flush=True)
 
             user_message = data.get("message", "")
             employee_info = data.get("employee", {})

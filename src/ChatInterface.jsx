@@ -229,6 +229,28 @@ const ChatInterface = () => {
     setEscalated(false);
   };
 
+  // Resolve Human Ticket and return to AI
+  const handleResolveTicket = () => {
+    setEscalated(false);
+    
+    const sysMsg = {
+      id: currentMessages.length + 1,
+      sender: 'agent',
+      text: 'Ticket resolved by Human HR Representative. You are now connected to the AI Copilot again.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      citations: [],
+      suggestions: ['Check leave balance', 'View remote policy']
+    };
+    
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentSessionId) return s;
+      return {
+        ...s,
+        messages: [...s.messages, sysMsg]
+      };
+    }));
+  };
+
   // Switch to a previous chat session
   const handleSelectSession = (sessionId) => {
     setCurrentSessionId(sessionId);
@@ -308,11 +330,15 @@ const ChatInterface = () => {
             ...s.messages,
             {
               id: s.messages.length + 2,
-              sender: botResponse.escalated ? 'agent' : 'bot',
-              agentName: botResponse.agentName || 'Sarah Jenkins',
+              sender: 'bot', // The bot always delivers the escalation message
+              agentName: botResponse.agentName,
               text: botResponse.text,
               citations: botResponse.citations || [],
               suggestions: botResponse.suggestions || [],
+              confidence: botResponse.confidence,
+              isEscalationTrigger: botResponse.escalated,
+              backendSource: botResponse.backendSource,
+              isGemini: botResponse.isGemini,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }
           ]
@@ -355,21 +381,22 @@ const ChatInterface = () => {
 
       {/* Main Container */}
       <div 
-        className={`font-sans pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        onClickCapture={() => { if (isInputOnly) setDisplayMode('window') }}
+        className={`font-sans pointer-events-none transition-all duration-500 ease-in-out fixed z-50 flex flex-col items-end justify-end group/main ${
           isFullscreen 
-            ? 'fixed inset-3 md:inset-8 z-50 flex flex-col max-w-6xl mx-auto' 
-            : 'fixed bottom-6 right-6 w-full max-w-[620px] flex flex-col items-end justify-end z-50'
+            ? 'bottom-0 right-0 md:bottom-8 md:right-[calc(50vw-min(50vw-2rem,36rem))] w-full md:w-[calc(100vw-4rem)] max-w-6xl' 
+            : `bottom-6 right-8 w-full ${isInputOnly ? 'max-w-[620px] hover:max-w-[800px]' : 'max-w-[800px]'}`
         }`}
       >
         
         {/* Chat Window Card (Opens when in 'window' or 'fullscreen' mode) */}
         <div 
-          className={`w-full flex flex-col transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] origin-bottom overflow-hidden ${
+          className={`w-full flex flex-col transition-all duration-500 ease-in-out origin-bottom overflow-hidden ${
             isInputOnly 
-              ? 'scale-95 opacity-0 invisible pointer-events-none h-0' 
+              ? 'scale-95 opacity-0 invisible pointer-events-none h-0 group-hover/main:scale-100 group-hover/main:opacity-100 group-hover/main:visible group-hover/main:pointer-events-auto group-hover/main:h-[750px] group-hover/main:max-h-[calc(100vh-140px)]' 
               : isFullscreen
-                ? 'scale-100 opacity-100 visible pointer-events-auto flex-1 h-full'
-                : 'scale-100 opacity-100 visible pointer-events-auto h-[600px]'
+                ? 'scale-100 opacity-100 visible pointer-events-auto h-[calc(100vh-120px)] md:h-[calc(100vh-140px)]'
+                : 'scale-100 opacity-100 visible pointer-events-auto h-[750px] max-h-[calc(100vh-140px)]'
           }`}
         >
           {/* Card Glass Body */}
@@ -506,8 +533,7 @@ const ChatInterface = () => {
 
                 {/* Scrollable Previous Sessions List */}
                 <div 
-                  className="flex-1 overflow-y-auto px-2 py-1 space-y-1.5 scrollbar-none"
-                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  className="flex-1 overflow-y-auto px-2 py-1 space-y-1.5 custom-scrollbar"
                 >
                   {sessions.map((session) => {
                     const isSelected = session.id === currentSessionId;
@@ -593,8 +619,7 @@ const ChatInterface = () => {
 
                   {/* Horizontally Scrollable Persona Tabs */}
                   <div 
-                    className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar"
                   >
                     {TEAM_MEMBERS.map((member) => {
                       const isActive = member.id === selectedMemberId;
@@ -640,10 +665,8 @@ const ChatInterface = () => {
 
                 {/* Chat History Messages Stream */}
                 <div 
-                  className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 scroll-smooth"
-                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 scroll-smooth custom-scrollbar"
                 >
-                  <style>{`div::-webkit-scrollbar { display: none; }`}</style>
                   
                   {/* Persona Context Badge inside Chat */}
                   <div className="flex items-center justify-center mb-2">
@@ -654,11 +677,13 @@ const ChatInterface = () => {
                   </div>
 
                   {currentMessages.map((msg, index) => {
-                    const isEscalationBoundary = escalated && msg.sender === 'agent' && currentMessages[index - 1]?.sender !== 'agent';
-                    
                     return (
                       <React.Fragment key={`msg-${msg.id}-${index}`}>
-                        {isEscalationBoundary && (
+                        <MessageBubble 
+                          msg={msg} 
+                          onSelectSuggestion={handleSelectSuggestion} 
+                        />
+                        {msg.isEscalationTrigger && (
                           <div className="flex flex-col items-center my-4 select-none">
                             <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-500/20 backdrop-blur-md border border-purple-400/30 rounded-full shadow-sm">
                               <AlertTriangle size={14} className="text-purple-800" />
@@ -668,10 +693,6 @@ const ChatInterface = () => {
                             </div>
                           </div>
                         )}
-                        <MessageBubble 
-                          msg={msg} 
-                          onSelectSuggestion={handleSelectSuggestion} 
-                        />
                       </React.Fragment>
                     );
                   })}
@@ -705,7 +726,7 @@ const ChatInterface = () => {
           {isInputOnly && (
             <div 
               onClick={() => setDisplayMode('window')}
-              className="mb-2 px-4 py-2.5 bg-slate-900/95 hover:bg-slate-900 backdrop-blur-xl text-white rounded-2xl border border-white/20 shadow-xl cursor-pointer flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 transition-all group"
+              className="mb-2 px-4 py-2.5 bg-slate-900/95 hover:bg-slate-900 backdrop-blur-xl text-white rounded-2xl border border-white/20 shadow-xl cursor-pointer flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 transition-all duration-300 ease-out group group-hover/main:opacity-0 group-hover/main:scale-95 group-hover/main:h-0 group-hover/main:mb-0 group-hover/main:py-0 group-hover/main:border-0 overflow-hidden"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] bg-gradient-to-tr ${activeMember.color} text-white flex-shrink-0 shadow-sm`}>
@@ -721,8 +742,21 @@ const ChatInterface = () => {
             </div>
           )}
 
+          {/* Resolve Ticket Button for prototype testing */}
+          {escalated && !isInputOnly && (
+            <div className="mb-3 w-full flex justify-center animate-in fade-in slide-in-from-bottom-2">
+              <button 
+                onClick={handleResolveTicket} 
+                className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+              >
+                <CheckCircle size={15} />
+                Resolve Ticket & Resume AI
+              </button>
+            </div>
+          )}
+
           {/* Main Input Bar */}
-          <div className="w-full rounded-2xl p-2 sm:p-2.5 flex items-center gap-2 bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgb(0,0,0,0.18)] transition-all duration-300">
+          <div className="w-full rounded-[20px] p-2 sm:p-3 flex items-center gap-3 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_12px_45px_rgb(0,0,0,0.15)] transition-all duration-500 ease-out">
             
             {/* Mode Switcher Button */}
             <button 
@@ -744,21 +778,14 @@ const ChatInterface = () => {
             {!isInputOnly && (
               <button
                 onClick={() => setDisplayMode(isFullscreen ? 'window' : 'fullscreen')}
-                className="p-2 text-slate-600 hover:text-blue-600 transition-colors rounded-xl hover:bg-slate-100 hidden sm:flex flex-shrink-0"
+                className="p-2 sm:p-2.5 text-slate-600 hover:text-blue-600 transition-colors rounded-xl hover:bg-slate-100 hidden sm:flex flex-shrink-0"
                 title={isFullscreen ? "Restore Window" : "Maximize Fullscreen"}
               >
-                {isFullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+                {isFullscreen ? <Minimize2 size={21} /> : <Maximize2 size={21} />}
               </button>
             )}
             
-            <button 
-              className="p-2 text-slate-600 hover:text-slate-800 transition-colors rounded-xl hover:bg-slate-100 flex-shrink-0"
-              title="Attach File / Screenshot"
-            >
-              <Paperclip size={20} strokeWidth={2} />
-            </button>
-            
-            {/* Clean input field with single-line guarantee (NO text wrapping, NO native scrollbars) */}
+            {/* Clean input field with single-line guarantee */}
             <input
               type="text"
               value={inputValue}
@@ -768,7 +795,7 @@ const ChatInterface = () => {
                 if (isInputOnly) setDisplayMode('window');
               }}
               placeholder={`Ask HR as ${activeMember.name} (e.g. leave balance, WFH, allowances)...`}
-              className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 py-2.5 px-2 text-[14px] sm:text-[15px] text-slate-900 placeholder-slate-400 font-medium min-w-0"
+              className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 py-3.5 px-3 text-[15px] sm:text-[16px] text-slate-900 placeholder-slate-400 font-medium min-w-0"
             />
             
             {/* Enlarged Send Button */}
