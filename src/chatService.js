@@ -38,7 +38,7 @@
 // Backend configuration
 export const BACKEND_CONFIG = {
   // Replace with your real backend endpoint when ready
-  apiUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000/api/chat',
+  apiUrl: import.meta.env.VITE_BACKEND_URL || 'https://aa-t0gs.onrender.com/api/chat',
   // Set to true to bypass backend and use local mock; set to false to prefer real backend
   forceMock: false,
   // Timeout in milliseconds before falling back to local response (45s for LLM inference)
@@ -68,6 +68,7 @@ export async function sendChatMessage({ text, member, history = [] }) {
           employee: {
             id: member.id,
             name: member.name,
+            role: member.role,
           },
           history: history.slice(-6).map(m => ({
             sender: m.sender,

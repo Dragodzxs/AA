@@ -64,12 +64,13 @@ def query_gemini_ai(user_message, employee_info, history):
 
     emp_name = employee_info.get("name", "Alex Morgan")
     emp_id = employee_info.get("id", "EMP-1042")
+    emp_role = employee_info.get("role", "Employee")
 
     policy_context = "\n".join([f"- {item['answer']} (Sources: {', '.join(item['citations'])})" for item in FAQ_KNOWLEDGE_BASE])
 
     system_instruction = (
         "You are the Enterprise HR Copilot for Team Glitch Theory (#279) at Microsoft Innovate 2026 hackathon. "
-        f"You are speaking with employee {emp_name} ({emp_id}). "
+        f"You are speaking with {emp_name} ({emp_id}), who is currently logged in with the access role: {emp_role.upper()}. "
         "Answer naturally and professionally based strictly on the following enterprise HR policies:\n\n"
         f"COMPANY POLICY DATABASE:\n{policy_context}\n\n"
         "IMPORTANT: Do NOT greet the employee or use their name (e.g. 'Hi Alex') in every response. Just answer the question directly. "

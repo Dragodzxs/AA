@@ -28,97 +28,20 @@ import { sendChatMessage } from './chatService';
 const INITIAL_SESSIONS = [
   {
     id: 'session-1',
-    title: 'Remote Work & WFH Policy',
-    date: 'Today, 09:00 AM',
+    title: 'New Conversation',
+    date: 'Just now',
     memberId: 'EMP-1042',
     messages: [
       {
         id: 1,
         sender: 'bot',
-        text: 'Hello Alex, I am your Enterprise HR Assistant. Your WFH quota is active (up to 3 days/week) and your quarterly wellness stipend has been credited. How can HR assist you today with leave balance, reimbursements, or company policies?',
-        timestamp: '09:00 AM',
-        citations: ['Remote Work Policy 2026', 'Workplace Benefits Sec. 2'],
+        text: 'Hello! I am your Enterprise HR Assistant. How can I assist you today with leave balance, reimbursements, or company policies?',
+        timestamp: 'Just now',
+        citations: [],
         suggestions: [
           'What are our WFH core hours?',
           'Check my remaining leave balance',
-          'How to claim equipment reimbursement?',
-          'Escalate to Human HR'
-        ]
-      },
-      {
-        id: 2,
-        sender: 'user',
-        text: 'What are our WFH core hours?',
-        timestamp: '09:02 AM'
-      },
-      {
-        id: 3,
-        sender: 'bot',
-        text: 'Under the Bennett Enterprise Remote Policy, core synchronous hours are 10:00 AM to 3:00 PM for all engineering teams.',
-        timestamp: '09:02 AM',
-        citations: ['Remote Work Policy 2026', 'Employee Handbook Sec. 4'],
-        suggestions: [
-          'Can I work remotely during hackathons?',
-          'Who approves my remote work days?',
-          'Escalate to Human HR'
-        ]
-      }
-    ]
-  },
-  {
-    id: 'session-2',
-    title: 'Leave Approval Matrix',
-    date: 'Yesterday',
-    memberId: 'EMP-1088',
-    messages: [
-      {
-        id: 1,
-        sender: 'bot',
-        text: 'Hello Sarah, I am your Enterprise HR Assistant. Your annual performance review check-in is logged and your medical insurance benefits are active.',
-        timestamp: 'Yesterday, 04:15 PM',
-        citations: ['Team Management Guide 2026', 'Health & Insurance Policy'],
-        suggestions: [
-          'How do I approve team leave requests?',
-          'Health insurance claim procedure'
-        ]
-      }
-    ]
-  },
-  {
-    id: 'session-3',
-    title: 'Cloud Workstation Allowance',
-    date: 'Sep 29',
-    memberId: 'EMP-1015',
-    messages: [
-      {
-        id: 1,
-        sender: 'bot',
-        text: 'Hello Jordan, I am your Enterprise HR Assistant. Your cloud workspace allowance and workstation grant are verified.',
-        timestamp: 'Sep 29, 02:30 PM',
-        citations: ['Cloud Reimbursement Policy', 'Security Access Guidelines'],
-        suggestions: [
-          'Cloud stipend claim procedure',
-          'WFH guidelines for engineering'
-        ]
-      }
-    ]
-  },
-  {
-    id: 'session-4',
-    title: 'Sarah Jenkins • HR Hand-off',
-    date: 'Sep 27',
-    memberId: 'EMP-1042',
-    messages: [
-      {
-        id: 1,
-        sender: 'agent',
-        agentName: 'Sarah Jenkins',
-        text: 'Hi Alex, I am Sarah from Human Resources. I have noted your inquiry regarding team hardware allocation for Project #279.',
-        timestamp: 'Sep 27, 11:20 AM',
-        citations: ['Direct HR Representative Hand-off'],
-        suggestions: [
-          'Schedule a 1-on-1 HR call',
-          'Confidential policy inquiry'
+          'How to claim equipment reimbursement?'
         ]
       }
     ]
@@ -137,8 +60,25 @@ const ChatInterface = () => {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
   // Chat sessions state
-  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
-  const [currentSessionId, setCurrentSessionId] = useState('session-1');
+  const [sessions, setSessions] = useState(() => {
+    const saved = localStorage.getItem('hr_chat_sessions');
+    return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
+  });
+  
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    const savedId = localStorage.getItem('hr_current_session_id');
+    return savedId || 'session-1';
+  });
+
+  // Save sessions to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('hr_chat_sessions', JSON.stringify(sessions));
+  }, [sessions]);
+
+  // Save currentSessionId to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('hr_current_session_id', currentSessionId);
+  }, [currentSessionId]);
 
   const [inputValue, setInputValue] = useState('');
   const [escalated, setEscalated] = useState(false);
@@ -286,8 +226,16 @@ const ChatInterface = () => {
     // 1. Add user message to current session
     setSessions(prev => prev.map(s => {
       if (s.id !== currentSessionId) return s;
+      
+      // Auto-update title on first user message
+      const isFirstUserMsg = !s.messages.some(m => m.sender === 'user');
+      const newTitle = isFirstUserMsg 
+        ? textToSend.substring(0, 25) + (textToSend.length > 25 ? '...' : '') 
+        : s.title;
+
       return {
         ...s,
+        title: newTitle,
         messages: [...s.messages, userMessage]
       };
     }));
@@ -306,7 +254,7 @@ const ChatInterface = () => {
       // 2. Query backend service (falls back gracefully to smart mock if backend is down)
       const botResponse = await sendChatMessage({
         text: textToSend,
-        member: activeMember,
+        member: { ...activeMember, role },
         history: [...currentMessages, userMessage],
       });
 
